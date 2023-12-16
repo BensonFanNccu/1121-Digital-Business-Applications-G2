@@ -1,0 +1,232 @@
+
+import { Meta } from '@storybook/blocks';
+import { Colors } from '../../components/Colors';
+import { iconsClassification } from './Icons-Classification.js'
+import copyicon from '../assets/copy.svg';
+
+<Meta title="General 通用/Icons 圖標/Icons Wiki 圖標大全"/>
+
+# Icons Wiki 圖標大全
+
+在你的 `Vue` 專案中，你可以使用 `Icons` 組件來使用圖標。\
+使用這個組件，你需要在 `.js` 檔中引入 `import MyIcon from 'storybook/src/components/Icons;'`<img id="copy" src={copyicon} alt="" 
+onClick={(e) => { navigator.clipboard.writeText(`import MyIcon from 'storybook/src/components/Icons;`)
+.then(() => { // show popup box when copied successfully
+  const popupBox = document.getElementById("popup-box");
+  popupBox.style.display = "block"; // show popup box
+  popupBox.style.top = (e.clientY + window.scrollY + 5) + "px"; // set popup box position, clientY is the mouse position relative to the browser window, scrollY is the scroll position of the window, 5 is the offset
+  popupBox.style.left = (e.clientX + window.scrollX + 5) + "px";
+  setTimeout(() => { popupBox.style.display = "none";}, 2000); // hide popup box after 2 seconds
+}).catch(() => {allert("something went wrong")} );}}/> ，\
+並在 `.vue` 檔中使用 `<my-icon name="icon-name" />` 來使用圖標。
+
+<div id="popup-box">Copied Successfully</div>
+{
+  Object.keys(iconsClassification).map((iconType) => {
+    const iconitems = Object.keys(iconsClassification[iconType]).map((iconName) =>{
+
+      const iconPath = `https://raw.githubusercontent.com/feathericons/feather/db2364f996e407cb933a37b6cafc96659debf771/icons/${iconName}.svg`;
+      return (<div className="my-item glow-on-hover" key={name} tabindex="0"
+      onClick={(e) => { navigator.clipboard.writeText(`<my-icon name="${iconName}" />`)
+      .then(() => {
+        const popupBox = document.getElementById("popup-box");
+        popupBox.style.display = "block";
+        popupBox.style.top = (e.clientY + window.scrollY + 5) + "px";
+        popupBox.style.left = (e.clientX + window.scrollX + 5) + "px";
+        // Hide popup box after 1.5 seconds
+        setTimeout(() => {
+          popupBox.style.display = "none";
+        }, 1500);})
+      .catch(() => {alert("something went wrong");}); }}
+      > 
+        <img src={iconPath}/>
+        <span>
+          <strong>{ iconName }</strong>
+          <p >{ iconsClassification[iconType][iconName] }</p>
+        </span>
+      </div>) 
+    })
+    
+    return (
+      <div class="icontypeblock">
+        <div className="subheading"> { iconType }</div>
+        <div className="my-list">{ iconitems }</div>
+      </div>
+    )
+  })
+}
+
+<style>
+  {`
+
+  #copy{
+    width: 18px;
+    height: 18px;
+    margin-left: 1px;
+    vertical-align: middle;
+  }
+  #copy:hover {
+    transform: translate3d(0, -3px, 0);
+    cursor: pointer;
+  }
+  #copy:active {
+    box-shadow: rgba(0, 0, 0, 0.15) 0 3px 10px 0;
+  }
+
+select {
+  border: 0;  
+}
+
+  .tip {
+      display: inline-block;
+      border-radius: 1em;
+      font-size: 11px;
+      line-height: 12px;
+      font-weight: 700;
+      background: ${Colors["bricks_red"]};
+      color: #FFF;
+      padding: 4px 12px;
+      margin-right: 10px;
+      vertical-align: middle;
+  }
+
+  #popup-box {
+    display: none;
+    transition: display 2s;
+    position: absolute;
+    padding: 3px 5px;
+    background-color: #666;
+    opacity: 0.8;
+    color: #fff;
+    font-size: 14px;
+    border-radius: 3px;
+    z-index: 999;
+  }
+
+  .icontypeblock {
+    margin-top: 40px;
+  }
+
+  .subheading {
+    --mediumdark: '#999999';
+    font-weight: 700;
+    font-size: 15px;
+    color: #666;
+    letter-spacing: 4px;
+    line-height: 24px;
+    text-transform: capitalize;
+    margin-bottom: 12px;
+  }
+
+  .my-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-rows: 1fr 1fr;
+    row-gap: 15px;
+    column-gap: 15px;
+  }
+
+  @media all and (-ms-high-contrast:none) {
+  .my-list {
+      display: -ms-grid;
+      -ms-grid-columns: 1fr 1fr;
+      -ms-grid-rows: 1fr 1fr;
+    }
+  }
+
+  .my-item {
+    padding: 20px;
+    border-radius: 10px;
+    transition: background 0.8s, border 150ms ease-out, transform 150ms ease-out;
+    display: flex;
+    align-items: flex-start;
+    
+  }
+
+  .my-item:hover {
+    transform: translate3d(0, -2px, 0);
+    cursor: pointer;
+    
+  }
+
+  .my-item:active {
+    transform: translate3d(0, 0, 0);
+    cursor: pointer;
+  }
+
+  .my-item strong {
+    font-weight: 700;
+    display: block;
+    margin-bottom: 2px;
+    color: #888
+  }
+
+  .my-item span,
+  .my-item p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 20px;
+    color: #000
+  }
+
+  .my-item img {
+    margin-right: 10px;
+    height: 43px;
+    filter: opacity(0.5) drop-shadow(0 0 0 blue);
+    transition: filter 0.8s, transform 0.5s;
+  }
+
+  .my-item:hover img {
+    margin-right: 10px;
+    height: 43px;
+    filter: opacity(0.5) drop-shadow(0 0 0 red);
+    transform: rotate(360deg) scale(1.1,1.1);
+  }
+
+.glow-on-hover {
+    cursor: pointer;
+    position: relative;
+    z-index: 0;
+}
+
+.glow-on-hover:before {
+    content: '';
+    background: linear-gradient(70deg, #C4F001, #F78A07, #E00485, #0721F7, #07ED8A, #C4F001);
+    position: absolute;
+    top: -2px;
+    left:-2px;
+    background-size: 400%;
+    z-index: -1;
+    filter: blur(5px);
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+    animation: glowing 20s linear infinite;
+    opacity: 0;
+    transition: opacity .3s ease-in-out;
+    border-radius: 10px;
+}
+
+
+.glow-on-hover:hover:before, .glow-on-hover:focus:before {
+    opacity: 1;
+}
+
+.glow-on-hover:after {
+    z-index: -1;
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #EEE;
+    left: 0;
+    top: 0;
+    border-radius: 10px;
+}
+
+@keyframes glowing {
+    0% { background-position: 0 0; }
+    50% { background-position: 400% 0; }
+    100% { background-position: 0 0; }
+}
+  `}
+</style>
