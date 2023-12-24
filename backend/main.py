@@ -45,7 +45,7 @@ def bricks():
 
 
 @app.route('/get_order', methods=['POST'])
-def login():
+def get_order():
     response_object = {'status': 'success'}
     
     try:
@@ -113,7 +113,7 @@ def login():
     return jsonify(response_object)
 
 @app.route('/get_cancel_order', methods=['POST'])
-def login():
+def get_cancel_order():
     response_object = {'status': 'success'}
     
     try:
