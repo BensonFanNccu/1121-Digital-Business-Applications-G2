@@ -29,8 +29,6 @@ app.config['SECRET_KEY'] = 'secret'
 #連線到伺服器上的 MySQL
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
 engine = create_engine(db_url, echo=True)
-Session=sessionmaker(bind=engine)
-session=Session()
 
 # Flask authentication configs
 app.config.from_object(__name__)
@@ -46,28 +44,140 @@ def bricks():
     return ("他媽的商務應用 操!")
 
 
-@app.route('/bricks_login', methods=['POST'])
-def bricks_login():
+@app.route('/get_order', methods=['POST'])
+def login():
     response_object = {'status': 'success'}
-    response_object['message'] = "登入成功"
-    post_data = request.get_json()
+    
     try:
-        user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        response_object['user_id'] = user.id
-        user_password = user.user_password
-        if user_password != post_data.get("username"):
-            response_object['status'] = "failure"
-            response_object['message'] = "您的密碼不正確，請再試一次"
-            return jsonify(response_object)
-    except IndexError:
-        response_object['status'] = "failure"
-        response_object['message'] = "您的帳號不正確，請再試一次"
-        return jsonify(response_object)
+        conn = engine.connect()
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "SELECT user_id 失敗"
+        response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
 
+    #取得資料
+    post_data = request.get_json()
+    flight_id = post_data.get("flight_id")
+    date = post_data.get("date")
+    #對比信箱，如正確回傳 user_id
+    
+    try:
+        if (flight_id != None)&(date != None):
+
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE f.FlightID = "{flight_id}"
+                AND o.Date = "{date}"
+                AND o.Status = "OK";
+            """
+        elif date != None:
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE o.Date = "{date}"
+                AND o.Status = "OK";
+            """
+        elif flight_id != None:
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE f.FlightID = "{flight_id}"
+                AND o.Status = "OK";
+            """
+        result = conn.execute(text(query))
+        keys = list(result.keys())
+        data = [dict(zip(keys, row)) for row in result.fetchall()]
+        print(data)
+        response_object['orders'] = data
+            
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋{flight_id}&{date}訂單資料"
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+@app.route('/get_cancel_order', methods=['POST'])
+def login():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    #取得資料
+    post_data = request.get_json()
+    flight_id = post_data.get("flight_id")
+    date = post_data.get("date")
+    #對比信箱，如正確回傳 user_id
+    
+    try:
+        if (flight_id != None)&(date != None):
+
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE f.FlightID = "{flight_id}"
+                AND o.Date = "{date}"
+                AND o.Status = "Cancel";
+            """
+        elif date != None:
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE o.Date = "{date}"
+                AND o.Status = "Cancel";
+            """
+        elif flight_id != None:
+            query = f"""
+                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                JOIN flight f
+                ON o.FlightID = f.FlightID
+                JOIN customer c
+                ON c.CustomerID = o.CustomerID
+                WHERE f.FlightID = "{flight_id}"
+                AND o.Status = "Cancel";
+            """
+        result = conn.execute(text(query))
+        keys = list(result.keys())
+        data = [dict(zip(keys, row)) for row in result.fetchall()]
+        print(data)
+        response_object['orders'] = data
+            
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋{flight_id}&{date}退單資料"
+    result.close()
+    conn.close()
+    
     return jsonify(response_object)
 
 if __name__ == "__main__":
