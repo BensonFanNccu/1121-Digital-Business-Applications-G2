@@ -29,7 +29,7 @@ engine = create_engine(db_url, echo=True)
 app.config.from_object(__name__)
 
 # hello world route
-@app.route('/', methods=['GET'])
+@app.route('/hello', methods=['GET'])
 def greetings():
     return ("Hello, world!")
 
