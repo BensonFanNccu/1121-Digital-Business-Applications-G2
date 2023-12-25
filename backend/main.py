@@ -4,9 +4,6 @@ from flask_cors import CORS
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from flask import Flask, jsonify, request
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import *
-from flask_httpauth import HTTPTokenAuth
 
 # load_dotenv()
 
