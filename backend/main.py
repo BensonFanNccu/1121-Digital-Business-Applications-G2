@@ -1,14 +1,9 @@
 # from dotenv import load_dotenv
-from flask import Flask, current_app
+from flask import Flask
 from flask_cors import CORS
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
-# from fuzzywuzzy import fuzz
-import hashlib
-# import jwt
-import logging
-from flask import Flask, jsonify, request, current_app
-from time import time
+from flask import Flask, jsonify, request
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
@@ -38,10 +33,6 @@ app.config.from_object(__name__)
 def greetings():
     return ("Hello, world!")
 
-
-@app.route('/bricks', methods=['GET'])
-def bricks():
-    return ("他媽的商務應用 操!")
 
 def query2dict(query, conn):
     result = conn.execute(text(query))
@@ -444,6 +435,249 @@ def PCV():
         return jsonify(response_object)
     
     response_object['message'] = f""
+    conn.close()
+    
+    return jsonify(response_object)
+
+@app.route('/LTV', methods=['GET'])
+def LTV():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    current_time = datetime.now()
+    current_month = current_time.month
+
+    if current_month <= 3:
+        quarter = 1
+    elif current_month <=6:
+        quarter = 2
+    elif current_month <= 9:
+        quarter = 3
+    else:
+        quarter = 4
+
+    try:
+        queryCount = f"""
+            SELECT count(CustomerID) AS count FROM customer;
+        """
+        countResult = conn.execute(text(queryCount))
+        cRow = countResult.fetchone()
+        custNum = cRow[0]
+
+        year = 2023
+        rate = 0.02
+        LTVlist = []
+
+        for i in range(1, custNum + 1):
+            query = f"""
+                SELECT sum(t.Price) FROM orders as o, ticketprice as t 
+                WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
+                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+            """
+
+            result = conn.execute(text(query))
+            row = result.fetchone()
+            value = row[0]
+
+            if value != None:
+                LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
+            else:
+                LTV = 0
+
+            dictLTV = {"CustomerID:" : i, "LTV" : str(round(LTV, 5))}
+            LTVlist.append(dictLTV)
+        
+            update = f"""
+                UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+            """
+            conn.execute(text(update))
+            conn.execute(text("COMMIT;"))        
+        
+        response_object['LTV'] = LTVlist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋的顧客的終身價值"
+    result.close()
+    countResult.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+@app.route('/get_retention_rate', methods=['POST'])
+def get_retention_rate():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    post_data = request.get_json()
+    year = post_data.get("year")
+    period = post_data.get("period")
+
+    try:
+        if period == 1:
+            query_curyr = f"""
+                SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
+            """
+
+            query_lastyr = f"""
+                SELECT count(distinct(o.CustomerId)) FROM orders o
+                WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+            """
+        
+        elif period == 2:
+            query_curyr = f"""
+                SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                WHERE (o.Date BETWEEN '{year}/4/1' AND '{year}/6/30') 
+                AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/1/1' AND '{year}/3/31');
+            """
+            query_lastyr = f"""
+                SELECT count(distinct(o.CustomerId)) FROM orders o
+                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/3/31';
+            """
+
+        elif period == 3:
+            query_curyr = f"""
+                SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                WHERE (o.Date BETWEEN '{year}/7/1' AND '{year}/9/30') 
+                AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/4/1' AND '{year}/6/30');
+            """
+            query_lastyr = f"""
+                SELECT count(distinct(o.CustomerId)) FROM orders o
+                WHERE o.Date BETWEEN '{year}/4/1' AND '{year}/6/30';
+            """
+
+        else:
+            query_curyr = f"""
+                SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                WHERE (o.Date BETWEEN '{year}/10/1' AND '{year}/12/31') 
+                AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/7/1' AND '{year}/9/30');
+            """
+            query_lastyr = f"""
+                SELECT count(distinct(o.CustomerId)) FROM orders o
+                WHERE o.Date BETWEEN '{year}/7/1' AND '{year}/9/30';
+            """
+
+        result_cur = conn.execute(text(query_curyr))
+        row_cur = result_cur.fetchone()
+        count_cur = row_cur[0]
+
+        result_last = conn.execute(text(query_lastyr))
+        row_last = result_last.fetchone()
+        count_last = row_last[0]
+
+        
+        if count_last == 0:
+            retRate = '--'
+            dictRR = {"retention rate: " : retRate}
+            response_object['value'] = dictRR
+        else:
+            retRate = count_cur / count_last
+            dictRR = {"retention rate: " : str(retRate)}
+            response_object['value'] = dictRR
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋{year}年第{period}期的留存率資料"
+    result_cur.close()
+    result_last.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+
+@app.route('/get_survival_rate', methods=['POST'])
+def get_survival_rate():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    post_data = request.get_json()
+    year = post_data.get("year")
+    period = post_data.get("period")
+
+    surRate = 1
+
+    try:
+        for i in range(1, period + 1):
+            if i == 1:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                """
+            else:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/31') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                """
+
+            result_cur = conn.execute(text(query_curyr))
+            row_cur = result_cur.fetchone()
+            count_cur = row_cur[0]
+
+            result_last = conn.execute(text(query_lastyr))
+            row_last = result_last.fetchone()
+            count_last = row_last[0]
+
+            if count_last == 0:
+                surRate = 0
+                dictSR = {"survival rate: " : surRate}
+                response_object['value'] = dictSR
+                break
+            else:
+                retRate = count_cur / count_last
+                surRate *= retRate
+
+            dictSR = {"survival rate: " : str(surRate)}
+            response_object['value'] = dictSR
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋{year}年第{period}期的存活率資料"
+    result_cur.close()
+    result_last.close()
     conn.close()
     
     return jsonify(response_object)
