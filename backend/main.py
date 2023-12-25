@@ -75,6 +75,7 @@ def set_parameter():
     
     return jsonify(response_object)
 
+
 @app.route('/revenue_analysis', methods=['POST'])
 def revenue_analysis():
     response_object = {'status': 'success'}
@@ -148,6 +149,7 @@ def revenue_analysis():
     
     return jsonify(response_object)
 
+
 @app.route('/get_order', methods=['POST'])
 def get_order():
     response_object = {'status': 'success'}
@@ -216,6 +218,7 @@ def get_order():
     
     return jsonify(response_object)
 
+
 @app.route('/get_cancel_order', methods=['POST'])
 def get_cancel_order():
     response_object = {'status': 'success'}
@@ -283,6 +286,7 @@ def get_cancel_order():
     conn.close()
     
     return jsonify(response_object)
+
 
 @app.route('/RFM', methods=['GET'])
 def RFM():
@@ -392,6 +396,7 @@ def RFM():
     
     return jsonify(response_object)
 
+
 @app.route('/PCV', methods=['GET'])
 def PCV():
     response_object = {'status': 'success'}
@@ -438,6 +443,7 @@ def PCV():
     conn.close()
     
     return jsonify(response_object)
+
 
 @app.route('/LTV', methods=['GET'])
 def LTV():
@@ -514,6 +520,7 @@ def LTV():
     
     return jsonify(response_object)
 
+
 @app.route('/get_retention_rate', methods=['POST'])
 def get_retention_rate():
     response_object = {'status': 'success'}
@@ -583,15 +590,16 @@ def get_retention_rate():
         row_last = result_last.fetchone()
         count_last = row_last[0]
 
-        
         if count_last == 0:
             retRate = '--'
             dictRR = {"retention rate: " : retRate}
-            response_object['value'] = dictRR
+            RRlist = [dictRR]
+            response_object['retention rate'] = RRlist
         else:
             retRate = count_cur / count_last
-            dictRR = {"retention rate: " : str(retRate)}
-            response_object['value'] = dictRR
+            dictRR = {"retention rate: " : retRate}
+            RRlist = [dictRR]
+            response_object['retention rate'] = RRlist
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -600,6 +608,78 @@ def get_retention_rate():
         return jsonify(response_object)
 
     response_object['message'] = f"成功搜尋{year}年第{period}期的留存率資料"
+    result_cur.close()
+    result_last.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+
+@app.route('/get_all_retention_rate', methods=['GET'])
+def get_all_retention_rate():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    year = 2023
+    RRlist = []
+
+    try:
+        for i in range(1, 5):
+            if i == 1:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                """
+
+            else:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                """
+
+            result_cur = conn.execute(text(query_curyr))
+            row_cur = result_cur.fetchone()
+            count_cur = row_cur[0]
+
+            result_last = conn.execute(text(query_lastyr))
+            row_last = result_last.fetchone()
+            count_last = row_last[0]
+
+            if count_last == 0:
+                retRate = '--'
+            else:
+                retRate = count_cur / count_last
+            
+            dictRR = {"retention rate of quarter {}".format(str(i)) : retRate}
+            RRlist.append(dictRR)
+
+        response_object['retention rate'] = RRlist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋{year}年的留存率資料"
     result_cur.close()
     result_last.close()
     conn.close()
@@ -660,14 +740,15 @@ def get_survival_rate():
             if count_last == 0:
                 surRate = 0
                 dictSR = {"survival rate: " : surRate}
-                response_object['value'] = dictSR
+                SRlist = [dictSR]
+                response_object['survival rate'] = SRlist
                 break
             else:
                 retRate = count_cur / count_last
                 surRate *= retRate
-
-            dictSR = {"survival rate: " : str(surRate)}
-            response_object['value'] = dictSR
+                dictSR = {"survival rate: " : surRate}
+                SRlist = [dictSR]
+                response_object['survival rate'] = SRlist
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -681,6 +762,81 @@ def get_survival_rate():
     conn.close()
     
     return jsonify(response_object)
+
+
+@app.route('/get_all_survival_rate', methods=['GET'])
+def get_all_survival_rate():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    surRate = 1
+    SRlist = []
+    year = 2023
+
+    try:
+        for i in range(1, 5):
+            if i == 1:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                """
+
+            else:
+                query_curyr = f"""
+                    SELECT count(distinct(o.CustomerID)) FROM orders as o 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
+                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                """
+
+                query_lastyr = f"""
+                    SELECT count(distinct(o.CustomerId)) FROM orders o
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                """
+
+            result_cur = conn.execute(text(query_curyr))
+            row_cur = result_cur.fetchone()
+            count_cur = row_cur[0]
+
+            result_last = conn.execute(text(query_lastyr))
+            row_last = result_last.fetchone()
+            count_last = row_last[0]
+
+            if count_last == 0:
+                surRate = 0
+            else:
+                retRate = count_cur / count_last
+                surRate *= retRate
+            
+            dictSR = {"survival rate of quarter {}".format(str(i)) : surRate}
+            SRlist.append(dictSR)
+
+        response_object['survival rate'] = SRlist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋{year}年的存活率資料"
+    result_cur.close()
+    result_last.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
   
 if __name__ == "__main__":
     app.run(debug=True)
