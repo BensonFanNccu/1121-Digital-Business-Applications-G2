@@ -681,6 +681,213 @@ def get_survival_rate():
     conn.close()
     
     return jsonify(response_object)
+
+@app.route('/get_customer_info', methods=['GET'])
+def get_customer_info():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    customer_info_list = []
+
+    # RFM
+    def get_RFM():
+        try:
+            #設定分數
+            def level(data, name):
+                for i in range(len(data)):
+                    if i <= len(data) * 0.2:
+                        data[i][name] = 5
+                    elif i <= len(data) * 0.4:
+                        data[i][name] = 4
+                    elif i <= len(data) * 0.6:
+                        data[i][name] = 3
+                    elif i <= len(data) * 0.8:
+                        data[i][name] = 2
+                    elif i <= len(data):
+                        data[i][name] = 1
+                data = sorted(data, key = lambda x:x['CustomerID']) 
+                return data
+            
+            #設定權重
+            recency_weight = 0.3
+            frequency_weight = 0.3
+            monetary_weight = 0.4
+
+            # Recency
+            recency_query = f"""
+                SELECT CustomerID, MAX(Date) AS recent_date FROM orders
+                GROUP BY CustomerID
+                ORDER BY recent_date;
+            """
+            recency_data = query2dict(recency_query, conn)
+            recency_data = level(recency_data, "recency_level") 
+            print(recency_data)
+
+            #Frequency
+            year = "2023"
+            frequency_query = f"""
+                SELECT CustomerID, COUNT(OrderID) AS frequency FROM orders
+                WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
+                GROUP BY CustomerID
+                ORDER BY frequency DESC;
+            """
+            frequency_data = query2dict(frequency_query, conn)
+            frequency_data = level(frequency_data, "frequency_level") 
+            print(frequency_data)
+            
+            #Monetary
+            monetary_query = f"""
+                SELECT o.CustomerID, SUM(p.Price) AS monetary FROM orders o
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/12/31'
+                GROUP BY CustomerID
+                ORDER BY monetary DESC;
+            """
+            monetary_data = query2dict(monetary_query, conn)
+            monetary_data = level(monetary_data, "monetary_level") 
+            print(monetary_data)
+
+            #計算總分
+            RFM_result = []
+            for i in range(len(recency_data)):
+                RFM_result.append(
+                {
+                    "CustomerID": recency_data[i]["CustomerID"],
+                    "total_score": recency_data[i]["recency_level"]*recency_weight + frequency_data[i]["frequency_level"]*frequency_weight + monetary_data[i]["monetary_level"]*monetary_weight,
+                    "recency_score": recency_data[i]["recency_level"],
+                    "frequency_score": frequency_data[i]["frequency_level"],
+                    "monetary_score": monetary_data[i]["monetary_level"],
+                })
+            RFM_result = sorted(RFM_result, key = lambda x:x["total_score"], reverse=True)
+            RFM_result = level(RFM_result, "RFM_group")
+            RFM_result = sorted(RFM_result, key = lambda x:x["RFM_group"], reverse=True)
+            print(RFM_result)
+            # response_object['RFM'] = RFM_result
+            # customer_info_list = RFM_result
+
+            #寫入資料庫
+            for i in RFM_result:
+                update = f"""
+                    UPDATE customer SET RFM = {i["RFM_group"]} WHERE CustomerID = {i["CustomerID"]} 
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+    
+    # get LTV
+    def get_LTV(year, rate, current_month):
+
+        if current_month <= 3:
+            quarter = 1
+        elif current_month <=6:
+            quarter = 2
+        elif current_month <= 9:
+            quarter = 3
+        else:
+            quarter = 4
+
+        try:
+            query = f"""
+                SELECT o.CustomerID, sum(t.Price) as total_price FROM orders as o
+                JOIN ticketprice as t
+                ON o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID
+                WHERE (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31')
+                GROUP BY o.CustomerID;
+            """
+            price_data = query2dict(query, conn)
+
+            for i in price_data:
+                if i["total_price"] != None:
+                    LTV = i["total_price"] * (1 - 1 / (1 + rate) ** 4) / rate
+                else:
+                    LTV = 0
+
+                # for j in customer_info_list:
+                #     if j["CustomerID"] == i["CustomerID"]:
+                #         j["LTV"] = LTV
+            
+                update = f"""
+                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i["CustomerID"]};
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))        
+
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+
+
+    # PCV
+    def get_PCV(year, rate):
+        try:
+            query = f"""
+                SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                JOIN customer
+                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/12/31'
+                GROUP BY CustomerID
+                ORDER BY PCV DESC;
+            """
+            past_value_data = query2dict(query, conn)
+            for i in past_value_data:
+                i["PCV"] = i["PCV"]/(1+rate)
+                # for j in customer_info_list:
+                #     if j["CustomerID"] == i["CustomerID"]:
+                #         j["PCV"] = i["PCV"]
+
+            #寫入資料庫
+                update = f"""
+                    UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+        
+    
+    # 最後執行
+    current_time = datetime.now()
+    year = current_time.year
+    current_month = current_time.month
+    past_rate = 0.0125
+    future_rate = 0.02
+    get_RFM()
+    get_LTV(year, future_rate, current_month)
+    get_PCV(year, past_rate)
+
+    try:
+        query = f"""
+            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM FROM customer
+            ORDER BY CustomerID;
+        """
+        customer_info_list = query2dict(query, conn)
+        
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    # print(customer_info_list[0]["Birthday"])
+    response_object['customer_info'] = customer_info_list
+
+    return jsonify(response_object)
   
 if __name__ == "__main__":
     app.run(debug=True)
