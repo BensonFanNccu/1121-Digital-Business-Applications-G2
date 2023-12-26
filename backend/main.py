@@ -151,7 +151,29 @@ def revenue_analysis():
     
     return jsonify(response_object)
 
-
+@app.route('/get_all_flight_code', methods=['POST'])
+def get_all_flight_code():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    try:
+        query = """
+            SELECT FlightID, FlightCode FROM flight;
+        """
+        data = query2dict(query, conn)
+        response_object['flight_code'] = data
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    return jsonify(response_object)
+    
 @app.route('/get_order', methods=['POST'])
 def get_order():
     response_object = {'status': 'success'}
@@ -173,32 +195,38 @@ def get_order():
         if (flight_id != None)&(date != None):
 
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE f.FlightID = "{flight_id}"
                 AND o.Date = "{date}"
                 AND o.Status = "OK";
             """
         elif date != None:
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE o.Date = "{date}"
                 AND o.Status = "OK";
             """
         elif flight_id != None:
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE f.FlightID = "{flight_id}"
                 AND o.Status = "OK";
             """
@@ -242,32 +270,38 @@ def get_cancel_order():
         if (flight_id != None)&(date != None):
 
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE f.FlightID = "{flight_id}"
                 AND o.Date = "{date}"
                 AND o.Status = "Cancel";
             """
         elif date != None:
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE o.Date = "{date}"
                 AND o.Status = "Cancel";
             """
         elif flight_id != None:
             query = f"""
-                SELECT o.FlightID, o.CustomerId, o.PriceLevel, o.Date FROM orders o
+                SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
                 ON o.FlightID = f.FlightID
                 JOIN customer c
                 ON c.CustomerID = o.CustomerID
+                JOIN ticketprice p
+                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
                 WHERE f.FlightID = "{flight_id}"
                 AND o.Status = "Cancel";
             """
@@ -833,6 +867,7 @@ def get_all_survival_rate():
     conn.close()
     
     return jsonify(response_object) 
+
 @app.route('/get_customer_info', methods=['GET'])
 def get_customer_info():
     response_object = {'status': 'success'}
