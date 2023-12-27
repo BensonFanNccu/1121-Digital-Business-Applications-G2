@@ -151,6 +151,165 @@ def revenue_analysis():
     
     return jsonify(response_object)
 
+@app.route('/get_sales_rate', methods=['POST'])
+def get_sales_rate():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+    flight_code = post_data.get("flight_code")
+    time = post_data.get("time")
+    print(time)
+    year = ['2023']
+    
+    try:
+        querySeat = f"""
+            SELECT a.SeatNumber 
+            FROM flight as f
+            JOIN airplanetype as a 
+            ON f.AirplaneTypeID = a.AirplaneTypeID
+            WHERE f.FlightCode = '{flight_code}';
+        """
+        seat_num = query2dict(querySeat, conn)
+        sales_list = []
+
+        if time == "月":
+            # print("month")
+            if flight_code == "全部":
+                for y in year:
+                    for i in range(1, 13):
+                        if i == 2:
+                            query = f"""
+                                SELECT COUNT(o.OrderID) FROM orders o 
+                                WHERE o.FlightCode = '{flight_code}'                              
+                                AND o.Status = 'OK'
+                                AND o.Date BETWEEN '{y}/{i}/1' AND '{y}/{i}/28'
+                                GROUP BY o.OrderID;
+                            """
+                        else:
+                            query = f"""
+                                SELECT COUNT(o.OrderID) count FROM orders o 
+                                WHERE o.FlightCode = '{flight_code}'                              
+                                AND o.Status = 'OK'
+                                AND o.Date BETWEEN '{y}/{i}/1' AND '{y}/{i}/30'
+                                GROUP BY o.OrderID;
+                            """
+                        sales_num = query2dict(query, conn)
+                        if len(sales_num) == 0:
+                            sales_rate = 0
+                        else:
+                            sales = 0
+                            for num in sales_num:
+                                sales += num["count"] 
+                            sales_rate = sales / seat_num[0]["SeatNumber"]
+                        sales_list.append({f"{y}/{i}": sales_rate})
+                
+                response_object['sales_rate_list'] = sales_list
+
+            else:               
+                for y in year:
+                    for i in range(1, 13):
+                        if i == 2:
+                            query = f"""
+                                SELECT COUNT(o.OrderID) count FROM orders o
+                                JOIN flight f
+                                ON o.FlightID = f.FlightID
+                                WHERE f.FlightCode = '{flight_code}'                             
+                                AND o.Status = 'OK'
+                                AND o.Date BETWEEN '{y}/{i}/1' AND '{y}/{i}/28'
+                                GROUP BY o.OrderID;
+                            """
+                        else:
+                            query = f"""
+                                SELECT COUNT(o.OrderID) count FROM orders o
+                                JOIN flight f
+                                ON o.FlightID = f.FlightID
+                                WHERE f.FlightCode = '{flight_code}'                             
+                                AND o.Status = 'OK'
+                                AND o.Date BETWEEN '{y}/{i}/1' AND '{y}/{i}/30'
+                                GROUP BY o.OrderID;
+                            """
+                        sales_num = query2dict(query, conn)
+                        if len(sales_num) == 0:
+                            sales_rate = 0
+                        else:
+                            sales = 0
+                            for num in sales_num:
+                                sales += num["count"] 
+                            sales_rate = sales / seat_num[0]["SeatNumber"]
+                        sales_list.append({f"{y}/{i}": sales_rate})
+                
+                response_object['sales_rate_list'] = sales_list
+
+        elif time == "季":
+            # print("season")
+            for y in year:
+                for i in range(1, 5):
+
+                    query = f"""
+                        SELECT COUNT(o.OrderID) count FROM orders o
+                        JOIN flight f
+                        ON o.FlightID = f.FlightID
+                        WHERE f.FlightCode = '{flight_code}'                             
+                        AND o.Status = 'OK'
+                        AND o.Date BETWEEN '{y}/{i*3-2}/1' AND '{y}/{i*3}/30'
+                        GROUP BY o.OrderID;
+                    """
+
+                    sales_num = query2dict(query, conn)
+                    if len(sales_num) == 0:
+                        sales_rate = 0
+                    else:
+                        sales = 0
+                        for num in sales_num:
+                            sales += num["count"] 
+                        sales_rate = sales / seat_num[0]["SeatNumber"]
+                    sales_list.append({f"{y} Q{i}": sales_rate})
+                
+            response_object['sales_rate_list'] = sales_list
+
+        elif time == "年":
+            # print("year")
+            for y in year:
+                query = f"""
+                        SELECT COUNT(o.OrderID) count FROM orders o
+                        JOIN flight f
+                        ON o.FlightID = f.FlightID
+                        WHERE f.FlightCode = '{flight_code}'                             
+                        AND o.Status = 'OK'
+                        AND o.Date BETWEEN '{y}/1/1' AND '{y}/12/31'
+                        GROUP BY o.OrderID;
+                    """
+
+                sales_num = query2dict(query, conn)
+                if len(sales_num) == 0:
+                    sales_rate = 0
+                else:
+                    sales = 0
+                    for num in sales_num:
+                        sales += num["count"] 
+                    sales_rate = sales / seat_num[0]["SeatNumber"]
+                sales_list.append({f"{y}": sales_rate})
+                
+            response_object['sales_rate_list'] = sales_list
+        
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(e)
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋{flight_code}的售票率 以{time}為單位"
+    conn.close()
+    
+    return jsonify(response_object)
+
 @app.route('/get_all_flight_code', methods=['GET'])
 def get_all_flight_code():
     response_object = {'status': 'success'}
