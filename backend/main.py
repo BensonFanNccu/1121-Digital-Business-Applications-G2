@@ -151,7 +151,7 @@ def revenue_analysis():
     
     return jsonify(response_object)
 
-@app.route('/get_all_flight_code', methods=['POST'])
+@app.route('/get_all_flight_code', methods=['GET'])
 def get_all_flight_code():
     response_object = {'status': 'success'}
     
@@ -235,7 +235,6 @@ def get_order():
         data = [dict(zip(keys, row)) for row in result.fetchall()]
         print(data)
         response_object['orders'] = data
-            
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
@@ -1072,7 +1071,7 @@ def get_customer_info():
         response_object['message'] = str(e)
         print(str(e))
         return jsonify(response_object)
-    # print(customer_info_list[0]["Birthday"])
+    print(customer_info_list)
     response_object['customer_info'] = customer_info_list
 
     return jsonify(response_object)
