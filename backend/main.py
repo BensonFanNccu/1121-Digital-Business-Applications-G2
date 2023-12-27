@@ -531,7 +531,7 @@ def LTV():
             else:
                 LTV = 0
 
-            dictLTV = {"CustomerID:" : i, "LTV" : str(round(LTV, 5))}
+            dictLTV = {"CustomerID" : i, "LTV" : str(round(LTV, 5))}
             LTVlist.append(dictLTV)
         
             update = f"""
@@ -555,9 +555,9 @@ def LTV():
     
     return jsonify(response_object)
 
-
-@app.route('/get_retention_rate', methods=['POST'])
-def get_retention_rate():
+# 單期的留存率
+@app.route('/get_single_retention_rate', methods=['POST'])
+def get_single_retention_rate():
     response_object = {'status': 'success'}
     
     try:
@@ -627,12 +627,12 @@ def get_retention_rate():
 
         if count_last == 0:
             retRate = '--'
-            dictRR = {"retention rate: " : retRate}
+            dictRR = {"retention rate" : retRate}
             RRlist = [dictRR]
             response_object['retention rate'] = RRlist
         else:
             retRate = count_cur / count_last
-            dictRR = {"retention rate: " : retRate}
+            dictRR = {"retention rate" : retRate}
             RRlist = [dictRR]
             response_object['retention rate'] = RRlist
 
@@ -649,9 +649,9 @@ def get_retention_rate():
     
     return jsonify(response_object)
 
-
-@app.route('/get_all_retention_rate', methods=['GET'])
-def get_all_retention_rate():
+# 全部期的留存率
+@app.route('/get_retention_rate', methods=['GET'])
+def get_retention_rate():
     response_object = {'status': 'success'}
     
     try:
@@ -703,9 +703,10 @@ def get_all_retention_rate():
             else:
                 retRate = count_cur / count_last
             
-            dictRR = {"retention rate of quarter {}".format(str(i)) : retRate}
+            dictRR = {"{} Q{}".format(str(year), str(i)) : retRate}
             RRlist.append(dictRR)
 
+        response_object['year'] = year
         response_object['retention rate'] = RRlist
 
     except Exception as e:
@@ -721,9 +722,9 @@ def get_all_retention_rate():
     
     return jsonify(response_object)
 
-
-@app.route('/get_survival_rate', methods=['POST'])
-def get_survival_rate():
+# 單期的存活率
+@app.route('/get_single_survival_rate', methods=['POST'])
+def get_single_survival_rate():
     response_object = {'status': 'success'}
     
     try:
@@ -774,14 +775,14 @@ def get_survival_rate():
 
             if count_last == 0:
                 surRate = 0
-                dictSR = {"survival rate: " : surRate}
+                dictSR = {"survival rate" : surRate}
                 SRlist = [dictSR]
                 response_object['survival rate'] = SRlist
                 break
             else:
                 retRate = count_cur / count_last
                 surRate *= retRate
-                dictSR = {"survival rate: " : surRate}
+                dictSR = {"survival rate" : surRate}
                 SRlist = [dictSR]
                 response_object['survival rate'] = SRlist
 
@@ -798,8 +799,9 @@ def get_survival_rate():
     
     return jsonify(response_object)
 
-@app.route('/get_all_survival_rate', methods=['GET'])
-def get_all_survival_rate():
+# 全部期的存活率
+@app.route('/get_survival_rate', methods=['GET'])
+def get_survival_rate():
     response_object = {'status': 'success'}
     try:
         conn = engine.connect()
@@ -807,6 +809,7 @@ def get_all_survival_rate():
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
+    
     surRate = 1
     SRlist = []
     year = 2023
@@ -851,26 +854,99 @@ def get_all_survival_rate():
                 retRate = count_cur / count_last
                 surRate *= retRate
             
-            dictSR = {"survival rate of quarter {}".format(str(i)) : surRate}
+            dictSR = {"{} Q{}".format(str(year), str(i)) : surRate}
             SRlist.append(dictSR)
 
+        response_object['year'] = year
         response_object['survival rate'] = SRlist
+
+
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
         print(str(e))
         return jsonify(response_object)
+    
     response_object['message'] = f"成功搜尋{year}年的存活率資料"
     result_cur.close()
     result_last.close()
     conn.close()
     
-    return jsonify(response_object) 
+    return jsonify(response_object)
+
+
+@app.route('/get_left_seat', methods=['POST'])
+def get_left_seat():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+    flightID = post_data.get("flightID")
+    date = post_data.get("date")
+    
+    try:
+        # 抓座位數
+        querySeat = f"""
+            SELECT a.SeatNumber FROM flight as f, airplanetype as a 
+            WHERE f.AirplaneTypeID = a.AirplaneTypeID AND f.FlightID = {flightID};
+        """
+
+        result_seat = conn.execute(text(querySeat))
+        row_seat = result_seat.fetchone()
+        seatNumber = int(row_seat[0])
+
+        # 獲取哪些座位被預訂
+        query = f"""
+            SELECT o.SeatID FROM orders o WHERE o.FlightID = {flightID} AND o.Date = "{date}" AND o.Status = 'OK';
+        """
+
+        result = conn.execute(text(query))
+        ordered_seat = []
+        for row in result.fetchall():
+            ordered_seat.append(int(row[0]))
+
+        # 獲取尚未被預訂的座位
+        vacant = []
+        for i in range(1, seatNumber + 1):
+            if(i in ordered_seat) == False:
+                vacant.append(i)
+
+        ordered_num = len(ordered_seat)
+        vacant_num = len(vacant)
+
+        # 被預定百分比/售票狀況
+        ratio = ordered_num / seatNumber
+        ratio = round(ratio, 4)
+
+        response_object['ordered_seat_list'] = ordered_seat
+        response_object['vacant_list'] = vacant
+        response_object['ordered_num'] = ordered_num
+        response_object['vacant_num'] = vacant_num
+        response_object['ordered_ratio'] = ratio
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋{date}的剩餘機位"
+    result_seat.close()
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
 
 @app.route('/get_customer_info', methods=['GET'])
 def get_customer_info():
     response_object = {'status': 'success'}
-
  
     try:
         conn = engine.connect()
@@ -1075,6 +1151,109 @@ def get_customer_info():
     response_object['customer_info'] = customer_info_list
 
     return jsonify(response_object)
+
+
+@app.route('/CE', methods=['GET'])
+def CE():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    year = 2023
+    rate = 0.02
+
+    # 算LTV
+    def calLTV(year, rate):
+        try:
+            conn = engine.connect()
+        except:
+            response_object['status'] = "failure"
+            response_object['message'] = "資料庫連線失敗"
+            return jsonify(response_object)
+
+        current_time = datetime.now()
+        current_month = current_time.month
+
+        if current_month <= 3:
+            quarter = 1
+        elif current_month <=6:
+            quarter = 2
+        elif current_month <= 9:
+            quarter = 3
+        else:
+            quarter = 4
+
+        try:
+            queryCount = f"""
+                SELECT count(CustomerID) AS count FROM customer;
+            """
+            countResult = conn.execute(text(queryCount))
+            cRow = countResult.fetchone()
+            custNum = cRow[0]
+
+            for i in range(1, custNum + 1):
+                query = f"""
+                    SELECT sum(t.Price) FROM orders as o, ticketprice as t 
+                    WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+                """
+
+                result = conn.execute(text(query))
+                row = result.fetchone()
+                value = row[0]
+
+                if value != None:
+                    LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
+                else:
+                    LTV = 0
+            
+                update = f"""
+                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+        
+        result.close()
+        countResult.close()
+        conn.close()
+
+    calLTV(year, rate)
+
+    try:
+        query = f"""
+            SELECT sum(LTV) FROM customer;
+        """
+
+        result = conn.execute(text(query))
+        row = result.fetchone()
+        ce = row[0]
+
+        dictCE = {"customer equity" : ce}
+        CElist = [dictCE]
+        response_object['customer equity'] = CElist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋CE"
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
   
 if __name__ == "__main__":
     app.run(debug=True)
