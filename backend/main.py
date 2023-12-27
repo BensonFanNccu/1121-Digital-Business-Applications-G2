@@ -532,7 +532,7 @@ def LTV():
             else:
                 LTV = 0
 
-            dictLTV = {"CustomerID:" : i, "LTV" : str(round(LTV, 5))}
+            dictLTV = {"CustomerID" : i, "LTV" : str(round(LTV, 5))}
             LTVlist.append(dictLTV)
         
             update = f"""
@@ -628,12 +628,12 @@ def get_single_retention_rate():
 
         if count_last == 0:
             retRate = '--'
-            dictRR = {"retention rate: " : retRate}
+            dictRR = {"retention rate" : retRate}
             RRlist = [dictRR]
             response_object['retention rate'] = RRlist
         else:
             retRate = count_cur / count_last
-            dictRR = {"retention rate: " : retRate}
+            dictRR = {"retention rate" : retRate}
             RRlist = [dictRR]
             response_object['retention rate'] = RRlist
 
@@ -776,14 +776,14 @@ def get_single_survival_rate():
 
             if count_last == 0:
                 surRate = 0
-                dictSR = {"survival rate: " : surRate}
+                dictSR = {"survival rate" : surRate}
                 SRlist = [dictSR]
                 response_object['survival rate'] = SRlist
                 break
             else:
                 retRate = count_cur / count_last
                 surRate *= retRate
-                dictSR = {"survival rate: " : surRate}
+                dictSR = {"survival rate" : surRate}
                 SRlist = [dictSR]
                 response_object['survival rate'] = SRlist
 
@@ -875,6 +875,7 @@ def get_survival_rate():
     
     return jsonify(response_object)
 
+
 @app.route('/get_left_seat', methods=['POST'])
 def get_left_seat():
     response_object = {'status': 'success'}
@@ -943,10 +944,10 @@ def get_left_seat():
     
     return jsonify(response_object)
 
+
 @app.route('/get_customer_info', methods=['GET'])
 def get_customer_info():
     response_object = {'status': 'success'}
-
  
     try:
         conn = engine.connect()
@@ -1153,7 +1154,106 @@ def get_customer_info():
     return jsonify(response_object)
 
 
+@app.route('/CE', methods=['GET'])
+def CE():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    year = 2023
+    rate = 0.02
 
+    # 算LTV
+    def calLTV(year, rate):
+        try:
+            conn = engine.connect()
+        except:
+            response_object['status'] = "failure"
+            response_object['message'] = "資料庫連線失敗"
+            return jsonify(response_object)
+
+        current_time = datetime.now()
+        current_month = current_time.month
+
+        if current_month <= 3:
+            quarter = 1
+        elif current_month <=6:
+            quarter = 2
+        elif current_month <= 9:
+            quarter = 3
+        else:
+            quarter = 4
+
+        try:
+            queryCount = f"""
+                SELECT count(CustomerID) AS count FROM customer;
+            """
+            countResult = conn.execute(text(queryCount))
+            cRow = countResult.fetchone()
+            custNum = cRow[0]
+
+            for i in range(1, custNum + 1):
+                query = f"""
+                    SELECT sum(t.Price) FROM orders as o, ticketprice as t 
+                    WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+                """
+
+                result = conn.execute(text(query))
+                row = result.fetchone()
+                value = row[0]
+
+                if value != None:
+                    LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
+                else:
+                    LTV = 0
+            
+                update = f"""
+                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+        
+        result.close()
+        countResult.close()
+        conn.close()
+
+    calLTV(year, rate)
+
+    try:
+        query = f"""
+            SELECT sum(LTV) FROM customer;
+        """
+
+        result = conn.execute(text(query))
+        row = result.fetchone()
+        ce = row[0]
+
+        dictCE = {"customer equity" : ce}
+        CElist = [dictCE]
+        response_object['customer equity'] = CElist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+
+    response_object['message'] = f"成功搜尋CE"
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
 
   
 if __name__ == "__main__":
