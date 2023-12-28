@@ -1,4 +1,3 @@
-# from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_httpauth import HTTPTokenAuth
@@ -11,8 +10,6 @@ import numpy as np
 import pandas as pd
 import gurobipy as grb
 import datetime as dt
-
-# load_dotenv()
 
 db_username = 'benson'
 db_password = 'Abc123456789!'
@@ -1780,8 +1777,8 @@ def booking():
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     dep_date = post_data.get("department_date")
-    # back_date = post_data.get("back_date")
     amount = post_data.get("amount")
+    pricelevel = post_data.get("class")
     seat = post_data.get("seat")
 
     custID = 1
@@ -1797,7 +1794,7 @@ def booking():
 
         insert = f"""
             INSERT INTO orders ('Date', 'PriceLevel', 'SeatID', 'CustomerID', 'FlightID', 'Amount', 'Status') 
-            VALUES ("{dep_date}", "A", {seat}, {custID}, {id}, {amount}, "OK");
+            VALUES ("{dep_date}", {pricelevel}, {seat}, {custID}, {id}, {amount}, "OK");
         """
         conn.execute(text(insert))
         conn.execute(text("COMMIT;"))
