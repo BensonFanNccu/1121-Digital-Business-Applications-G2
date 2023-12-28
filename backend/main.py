@@ -448,7 +448,7 @@ def get_order():
     #對比信箱，如正確回傳 user_id
     
     try:
-        if (flight_id != None)&(date != None):
+        if (flight_id != "")&(date != ""):
 
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
@@ -462,7 +462,7 @@ def get_order():
                 AND o.Date = "{date}"
                 AND o.Status = "OK";
             """
-        elif date != None:
+        elif date != "":
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
@@ -474,7 +474,7 @@ def get_order():
                 WHERE o.Date = "{date}"
                 AND o.Status = "OK";
             """
-        elif flight_id != None:
+        elif flight_id != "":
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
@@ -522,7 +522,7 @@ def get_cancel_order():
     #對比信箱，如正確回傳 user_id
     
     try:
-        if (flight_id != None)&(date != None):
+        if (flight_id != "")&(date != ""):
 
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
@@ -536,7 +536,7 @@ def get_cancel_order():
                 AND o.Date = "{date}"
                 AND o.Status = "Cancel";
             """
-        elif date != None:
+        elif date != "":
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
@@ -548,7 +548,7 @@ def get_cancel_order():
                 WHERE o.Date = "{date}"
                 AND o.Status = "Cancel";
             """
-        elif flight_id != None:
+        elif flight_id != "":
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
@@ -964,6 +964,7 @@ def get_retention_rate():
 
         response_object['year'] = year
         response_object['retention_rate'] = RRlist
+        print(RRlist)
 
     except Exception as e:
         response_object['status'] = "failure"
