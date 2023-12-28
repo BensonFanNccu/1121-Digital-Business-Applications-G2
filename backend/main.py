@@ -9,8 +9,6 @@ from sqlalchemy.orm import *
 
 import numpy as np
 import pandas as pd
-import gurobipy as grb
-import datetime as dt
 
 # load_dotenv()
 
@@ -80,7 +78,7 @@ def set_parameter():
     return jsonify(response_object)
 
 
-@app.route('/revenue_analysis_backend', methods=['POST'])
+@app.route('/revenue_analysis', methods=['POST'])
 def revenue_analysis():
     response_object = {'status': 'success'}
     
@@ -96,113 +94,14 @@ def revenue_analysis():
     try:
         # for 迴圈計算多天收益之後加，先測試一天的
         #模型計算(把模型加在這裡)
-        def movingAverage(date, Pdata, extraPeriod, n):
-            predict_date = date.split("-")
-            period = dt.date(int(predict_date[0]), int(predict_date[1]), int(predict_date[2])) - dt.date(2023, 2, 1)
-            period = period.days
 
-            data = Pdata['Price']
-            length = len(data)
-
-            data = np.append(data, [np.nan]*extraPeriod)
-            forecast = np.full(length + extraPeriod, np.nan)
-
-            for i in range(n, length):
-                forecast[i] = np.mean(data[i-n:i])
-
-            forecast[i+1:] = np.mean(data[i-n+1:i+1])
-
-            if(period <= 5):
-                return data[period]
-
-            print(period)
-            return forecast[period]
-        
-
-        def optimize(avg_Price):
-            mSeat = grb.Model('Seat')
-            seat_vars = {}
-            order_vars = {}
-            price_vars = {}
-
-            for i in range(5):
-                seat_vars[i]=mSeat.addVar(vtype=grb.GRB.INTEGER, name='x'+str(i+1))
-            for i in range(5):
-                price_vars[i]=mSeat.addVar(vtype=grb.GRB.INTEGER, name='p'+str(i+1))
-            for i in range(5):
-                order_vars[i]=mSeat.addVar(vtype=grb.GRB.INTEGER, name='y'+str(i+1))
-
-            mSeat.addConstr((seat_vars[0]+seat_vars[1]+seat_vars[2]+seat_vars[3]+seat_vars[4])==180)
-            mSeat.addConstr((order_vars[0]+order_vars[1]+order_vars[2]+order_vars[3]+order_vars[4])==180)
-
-            mSeat.addConstr((seat_vars[0]+seat_vars[1]+seat_vars[2]+seat_vars[3]+seat_vars[4])>=order_vars[0])
-            mSeat.addConstr((seat_vars[1]+seat_vars[2]+seat_vars[3]+seat_vars[4])>=order_vars[1])
-            mSeat.addConstr((seat_vars[2]+seat_vars[3]+seat_vars[4])>=order_vars[2])
-            mSeat.addConstr((seat_vars[3]+seat_vars[4])>=order_vars[3])
-            mSeat.addConstr(seat_vars[4]>=order_vars[4])
-
-            mSeat.addConstr(price_vars[0]>=7592)
-            mSeat.addConstr(price_vars[1]>=6424)
-            mSeat.addConstr(price_vars[2]>=5256)
-            mSeat.addConstr(price_vars[3]>=4088)
-            mSeat.addConstr(price_vars[4]>=2920)
-
-            mSeat.addConstr(price_vars[0]<=8760)
-            mSeat.addConstr(price_vars[1]<=7591)
-            mSeat.addConstr(price_vars[2]<=6423)
-            mSeat.addConstr(price_vars[3]<=5255)
-            mSeat.addConstr(price_vars[4]<=4087)
-
-            mSeat.addConstr(seat_vars[0]>=0)
-            mSeat.addConstr(seat_vars[1]>=0)
-            mSeat.addConstr(seat_vars[2]>=0)
-            mSeat.addConstr(seat_vars[3]>=0)
-            mSeat.addConstr(seat_vars[4]>=0)
-
-            mSeat.addConstr(seat_vars[0]<=18)
-            mSeat.addConstr(seat_vars[1]<=36)
-            mSeat.addConstr(seat_vars[2]<=54)
-            mSeat.addConstr(seat_vars[3]<=72)
-            mSeat.addConstr(seat_vars[4]<=90)
-
-            mSeat.addConstr(seat_vars[0]*price_vars[0]+seat_vars[1]*price_vars[1]+seat_vars[2]*price_vars[2]+seat_vars[3]*price_vars[3]+seat_vars[4]*price_vars[4]<=avg_Price*180)
-
-            objective = seat_vars[0]*price_vars[0]+seat_vars[1]*price_vars[1]+seat_vars[2]*price_vars[2]+seat_vars[3]*price_vars[3]+seat_vars[4]*price_vars[4]
-            mSeat.setObjective(objective,grb.GRB.MAXIMIZE)
-            mSeat.update()
-            mSeat.optimize()
-
-            return mSeat
-        
-        
-        def getSeatLevel(model):
-            vars = model.getVars()
-            seat_level = []
-            for i in range(0,5):
-                seat_level.append(vars[i].X)
-
-            return seat_level
-        
-        
-        def getPriceLevel(model):
-            vars = model.getVars()
-            price_level = []
-            for i in range(5,10):
-                price_level.append(vars[i].X)
-
-            return price_level
-
-        priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
-        avg_price = movingAverage("2023-7-25", priceData, 5, 5)
-        model = optimize(avg_price)
-        
         #測試資料
-        test_avaerge_daily_price = avg_price
-        test_seat_level_num = getSeatLevel(model)
-        test_price_level = getPriceLevel(model)
+        date = None
+        test_avaerge_daily_price = 0
+        test_seat_level_num = [120, 150, 130]
+        test_price_level = [7000, 6000, 4000]
 
-        print(test_price_level)
-        print(test_seat_level_num)
+        #模型輸出結果
 
         #預期收益
         avaerge_daily_price = test_avaerge_daily_price
@@ -1508,53 +1407,6 @@ def CE():
         print(str(e))
         return jsonify(response_object)
 
-    response_object['message'] = f"成功搜尋CE"
-    result.close()
-    conn.close()
-    
-    return jsonify(response_object)
-
-
-@app.route('/booking', methods = ['POST'])
-def booking():
-    response_object = {'status': 'success'}
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
-
-    post_data = request.get_json()
-    origin = post_data.get("origin")
-    dest = post_data.get("destination")
-    dep_date = post_data.get("department_date")
-    back_date = post_data.get("back_date")
-    number = post_data.get("number")
-    seat = post_data.get("seat")
-
-    try:
-        query = f"""
-            SELECT sum(LTV) FROM customer;
-        """
-
-        result = conn.execute(text(query))
-        row = result.fetchone()
-        ce = row[0]
-
-        update = f"""
-            UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
-        """
-        conn.execute(text(update))
-        conn.execute(text("COMMIT;"))
-        # response_object['customer equity'] = CElist
-
-    except Exception as e:
-        response_object['status'] = "failure"
-        response_object['message'] = str(e)
-        print(str(e))
-        return jsonify(response_object)
-    
     response_object['message'] = f"成功搜尋CE"
     result.close()
     conn.close()
