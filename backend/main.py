@@ -1731,6 +1731,38 @@ def class_rank():
                     SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
                     WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
                 """
+         elif time == "月":
+            query = f"""
+                SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+                GROUP BY t.PriceLevel ORDER BY Total DESC;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+            """
+
+        elif time == "季":
+            if month <= 3:
+                quarter = 1
+            elif month <=6:
+                quarter = 2
+            elif month <= 9:
+                quarter = 3
+            else:
+                quarter = 4
+
+            query = f"""
+                SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+                GROUP BY t.PriceLevel ORDER BY Total DESC;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+            """
             
         else: # 單日
             query = f"""
