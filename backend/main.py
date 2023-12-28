@@ -263,7 +263,6 @@ def get_sales_rate():
     post_data = request.get_json()
     flight_code = post_data.get("flight_code")
     time = post_data.get("time")
-    print(time)
     year = ['2023']
     
     try:
@@ -278,7 +277,6 @@ def get_sales_rate():
         sales_list = []
 
         if time == "月":
-            # print("month")
             if flight_code == "全部":
                 for y in year:
                     for i in range(1, 13):
@@ -346,7 +344,6 @@ def get_sales_rate():
                 response_object['sales_rate_list'] = sales_list
 
         elif time == "季":
-            # print("season")
             for y in year:
                 for i in range(1, 5):
 
@@ -373,7 +370,6 @@ def get_sales_rate():
             response_object['sales_rate_list'] = sales_list
 
         elif time == "年":
-            # print("year")
             for y in year:
                 query = f"""
                         SELECT COUNT(o.OrderID) count FROM orders o
@@ -1512,6 +1508,261 @@ def CE():
     return jsonify(response_object)
 
 
+@app.route('/region_rank', methods = ['POST'])
+def region_rank():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+    time = post_data.get("time")
+    rank_list = []
+    current_time = datetime.now()
+    year = current_time.year
+    month = current_time.month
+    day = current_time.day
+
+    try:
+        if time == "週":
+            if day > 7:
+                query = f"""
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}' 
+                    GROUP BY City ORDER BY Total DESC LIMIT 5;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}';
+                """
+
+            elif day == 1:
+                query = f"""
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30' 
+                    GROUP BY City ORDER BY Total DESC LIMIT 5;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30';
+                """
+
+            else:
+                query = f"""
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}' 
+                    GROUP BY City ORDER BY Total DESC LIMIT 5;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
+                """
+
+        elif time == "月":
+            query = f"""
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30' 
+                GROUP BY City ORDER BY Total DESC LIMIT 5;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30';
+            """
+
+        elif time == "季":
+            if month <= 3:
+                quarter = 1
+            elif month <=6:
+                quarter = 2
+            elif month <= 9:
+                quarter = 3
+            else:
+                quarter = 4
+
+            query = f"""
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30' 
+                GROUP BY City ORDER BY Total DESC LIMIT 5;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30';
+            """
+            
+        elif time == "年":
+            query = f"""
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/1/1' AND '{year}/12/31' 
+                GROUP BY City ORDER BY Total DESC LIMIT 5;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/1/1' AND '{year}/12/31';
+            """
+
+        else:  # 全部(不篩時間)，保險用
+            query = f"""
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK' GROUP BY City ORDER BY Total DESC LIMIT 5;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
+                WHERE o.Status = 'OK';
+            """
+
+        result = conn.execute(text(query))
+        result_all = conn.execute(text(query_all))
+        total = int(result_all.fetchone()[0]) # 全部城市的貢獻
+
+        i = 1
+        sum = 0
+        for row in result.fetchall():
+            ratio = int(row[1]) / total
+            rankDict = {"rank" : str(i), "region" : row[0], "rate" : str(round(ratio * 100, 2)) + "%", "value" : row[1]}
+            rank_list.append(rankDict)
+            sum += int(row[1])
+            i += 1
+
+        rest = {"rank" : "6", "region" : "其他", "rate" : str(round((total - sum) / total * 100, 2)) + "%", "value" : float(total - sum)}
+        rank_list.append(rest)
+
+        response_object['rank'] = rank_list
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"貢獻度前五高的城市"
+    result.close()
+    result_all.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+
+@app.route('/class_rank', methods = ['POST'])
+def class_rank():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+    time = post_data.get("time")
+    rank_list = []
+    current_time = datetime.now()
+    year = current_time.year
+    month = current_time.month
+    day = current_time.day
+    # day = 8
+
+    try:
+        if time == "週":
+            if day > 7:
+                query = f"""
+                    SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}' 
+                    GROUP BY t.PriceLevel ORDER BY Total DESC;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * t.Amount) FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}';
+                """
+            elif day == 1:
+                query = f"""
+                    SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30' 
+                    GROUP BY t.PriceLevel ORDER BY Total DESC;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30';
+                """
+            else:
+                query = f"""
+                    SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}' 
+                    GROUP BY t.PriceLevel ORDER BY Total DESC;
+                """
+
+                query_all = f"""
+                    SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                    WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
+                """
+            
+        else: # 單日
+            query = f"""
+                SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date = '{year}/{month}/{day}'
+                GROUP BY t.PriceLevel ORDER BY Total DESC;
+            """
+
+            query_all = f"""
+                SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
+                WHERE t.Date = '{year}/{month}/{day}';
+            """
+
+        result = conn.execute(text(query))
+        result_all = conn.execute(text(query_all))
+        total = int(result_all.fetchone()[0]) # 全部艙位的貢獻
+
+        for row in result.fetchall():
+            rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 2)) + "%", "value" : row[1]}
+            rank_list.append(rankDict)
+
+        response_object['rank'] = rank_list
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"艙位貢獻比例"
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
+
 @app.route('/booking', methods = ['POST'])
 def booking():
     response_object = {'status': 'success'}
@@ -1526,25 +1777,27 @@ def booking():
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     dep_date = post_data.get("department_date")
-    back_date = post_data.get("back_date")
-    number = post_data.get("number")
+    # back_date = post_data.get("back_date")
+    amount = post_data.get("amount")
     seat = post_data.get("seat")
 
-    try:
-        query = f"""
-            SELECT sum(LTV) FROM customer;
-        """
+    custID = 1
 
+    try:
+        # 抓航班ID
+        query = f"""
+            SELECT FlightID FROM flight WHERE Origin = '{origin}' AND Destination = '{dest}';
+        """
         result = conn.execute(text(query))
         row = result.fetchone()
-        ce = row[0]
+        id = int(row[0])
 
-        update = f"""
-            UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
+        insert = f"""
+            INSERT INTO orders ('Date', 'PriceLevel', 'SeatID', 'CustomerID', 'FlightID', 'Amount', 'Status') 
+            VALUES ("{dep_date}", "A", {seat}, {custID}, {id}, {amount}, "OK");
         """
-        conn.execute(text(update))
+        conn.execute(text(insert))
         conn.execute(text("COMMIT;"))
-        # response_object['customer equity'] = CElist
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -1552,7 +1805,7 @@ def booking():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f"成功搜尋CE"
+    response_object['message'] = f"成功訂位"
     result.close()
     conn.close()
     
