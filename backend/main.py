@@ -1760,7 +1760,7 @@ def class_rank():
                     SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
                     WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
                 """
-         elif time == "月":
+        elif time == "月":
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
                 WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
