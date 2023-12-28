@@ -74,28 +74,7 @@ def set_parameter():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f"參數設定成功"
-    conn.close()
-    
-    return jsonify(response_object)
-
-
-@app.route('/revenue_analysis_backend', methods=['POST'])
-def revenue_analysis():
-    response_object = {'status': 'success'}
-    
     try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
-    
-    post_data = request.get_json()
-
-    try:
-        # for 迴圈計算多天收益之後加，先測試一天的
-        #模型計算(把模型加在這裡)
         def movingAverage(date, Pdata, extraPeriod, n):
             predict_date = date.split("-")
             period = dt.date(int(predict_date[0]), int(predict_date[1]), int(predict_date[2])) - dt.date(2023, 2, 1)
@@ -195,51 +174,101 @@ def revenue_analysis():
         priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
         avg_price = movingAverage("2023-7-25", priceData, 5, 5)
         model = optimize(avg_price)
+
+        avaerge_daily_price = avg_price
+        seat_level_num = getSeatLevel(model)
+        price_level = getPriceLevel(model)
+        level = ['A', 'B', 'C', 'D', 'E']
+        level_list = []
+        for i in range(5):
+            level_list.append({"price_level":level[i],
+                               "price": price_level[i],
+                               "level_seat_num":seat_level_num[i]
+                               })
         
-        #測試資料
-        test_avaerge_daily_price = avg_price
-        test_seat_level_num = getSeatLevel(model)
-        test_price_level = getPriceLevel(model)
-
-        print(test_price_level)
-        print(test_seat_level_num)
-
-        #預期收益
-        avaerge_daily_price = test_avaerge_daily_price
-        seat_level_num = test_seat_level_num
-        price_level = test_price_level
-        total_rev = 0
-        for i in range(len(seat_level_num)):
-            total_rev += seat_level_num[i]*price_level[i]
-        response_object['predict_rev'] = total_rev
+        response_object["avaerge_daily_price"] = avaerge_daily_price
+        response_object["cabin_info"] = level_list
         
-        #成長率
-        last_year = 2022
-        last_rev_query = f"""
-            SELECT SUM(p.Price) AS last_year_rev FROM orders o
-            JOIN ticketprice p
-            ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-            WHERE o.Date BETWEEN '{last_year}/1/1' AND '{last_year}/12/31';
-        """
-        last_rev = query2dict(last_rev_query, conn)
-        rev_grow_rate = (total_rev - last_rev[0]["last_year_rev"])/last_rev[0]["last_year_rev"]
-        response_object['rev_grow_rate'] = rev_grow_rate
+        today = dt.datetime.today().strftime("%Y-%m-%d")
+        # 模型參數寫入資料庫
+        query = f"""
+                SELECT Price as num 
+                FROM ticketprice
+                WHERE Date = '{today}';
+            """
+        num = query2dict(query, conn)
+        print(num)
+        if num[0]['num'] == 0:
+            for i in range(5):
+                insert = f"""
+                    INSERT ticketprice (PriceLevel, Date, FlightID, Price, Amount)
+                    VALUES ('{level[i]}', '{today}', {1}, {price_level[i]}, {seat_level_num[i]});
+                """
+                conn.execute(text(insert))
+                conn.execute(text("COMMIT;"))
+        else:
+            for i in range(5):
+                update = f"""
+                    UPDATE ticketprice 
+                    SET Price = {price_level[i]}, Amount = {seat_level_num[i]}
+                    WHERE Date = '{today}' AND PriceLevel = '{level[i]}' AND FlightID = 1;
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
 
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"參數設定成功"
+    conn.close()
+    
+    return jsonify(response_object)
+
+
+@app.route('/past_revenue', methods=['POST'])
+def revenue_analysis():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+    time = post_data.get('time')
+    try:
+        
         #現有收益
         year = 2023
-        q = [1, 4, 7, 10]
         rev_list = []
-        for i in q:
-            rev_query = f"""
-                SELECT SUM(p.Price) AS rev FROM orders o
-                JOIN ticketprice p
-                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-                WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i+2}/31';
-            """
-            rev = query2dict(rev_query, conn)
-            rev_list.append(rev[0]["rev"])
+        if time == "季":
+            q = [1, 4, 7, 10]           
+            for i in q:
+                rev_query = f"""
+                    SELECT SUM(p.Price) AS rev FROM orders o
+                    JOIN ticketprice p
+                    ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                    WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i+2}/31';
+                """
+                rev = query2dict(rev_query, conn)
+                rev_list.append(rev[0]["rev"])
+        elif time == "月":
+            for i in range(1, 13):
+                rev_query = f"""
+                    SELECT SUM(p.Price) AS rev FROM orders o
+                    JOIN ticketprice p
+                    ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                    WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i}/31';
+                """
+                rev = query2dict(rev_query, conn)
+                rev_list.append(rev[0]["rev"]) 
         
-        response_object['rev_every_q'] = rev_list
+        response_object['past_rev'] = rev_list
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -247,7 +276,7 @@ def revenue_analysis():
         print(e)
         return jsonify(response_object)
     
-    response_object['message'] = f"參數設定成功"
+    response_object['message'] = f"搜尋成功"
     conn.close()
     
     return jsonify(response_object)
