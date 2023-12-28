@@ -10,6 +10,7 @@ from sqlalchemy.orm import *
 import numpy as np
 import pandas as pd
 import gurobipy as grb
+import datetime as dt
 
 # load_dotenv()
 
@@ -79,7 +80,7 @@ def set_parameter():
     return jsonify(response_object)
 
 
-@app.route('/revenue_analysis', methods=['POST'])
+@app.route('/revenue_analysis_backend', methods=['POST'])
 def revenue_analysis():
     response_object = {'status': 'success'}
     
@@ -97,7 +98,7 @@ def revenue_analysis():
         #模型計算(把模型加在這裡)
         def movingAverage(date, Pdata, extraPeriod, n):
             predict_date = date.split("-")
-            period = datetime.date(int(predict_date[0]), int(predict_date[1]), int(predict_date[2])) - datetime.date(2023, 2, 1)
+            period = dt.date(int(predict_date[0]), int(predict_date[1]), int(predict_date[2])) - dt.date(2023, 2, 1)
             period = period.days
 
             data = Pdata['Price']
@@ -175,31 +176,33 @@ def revenue_analysis():
         
         
         def getSeatLevel(model):
+            vars = model.getVars()
             seat_level = []
             for i in range(0,5):
-                seat_level.append(model[i].X)
+                seat_level.append(vars[i].X)
 
             return seat_level
         
         
         def getPriceLevel(model):
+            vars = model.getVars()
             price_level = []
-            for i in range(0,5):
-                price_level.append(model[i].X)
+            for i in range(5,10):
+                price_level.append(vars[i].X)
 
             return price_level
 
-        priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
-        avg_price = movingAverage("2023-8-7", priceData, 5, 5)
+        priceData = pd.read_csv("backend/Ticket_Price.csv", encoding='unicode_escape')
+        avg_price = movingAverage("2023-7-25", priceData, 5, 5)
         model = optimize(avg_price)
         
         #測試資料
-        date = "2023-8-7"
         test_avaerge_daily_price = avg_price
         test_seat_level_num = getSeatLevel(model)
         test_price_level = getPriceLevel(model)
 
-        #模型輸出結果
+        print(test_price_level)
+        print(test_seat_level_num)
 
         #預期收益
         avaerge_daily_price = test_avaerge_daily_price
