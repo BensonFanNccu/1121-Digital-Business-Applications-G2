@@ -1665,7 +1665,7 @@ def region_rank():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f"貢獻度前五高的城市"
+    response_object['message'] = f"收益前五高的城市，以" + str(time) + "為單位"
     result.close()
     result_all.close()
     conn.close()
@@ -1742,7 +1742,7 @@ def class_rank():
 
         result = conn.execute(text(query))
         result_all = conn.execute(text(query_all))
-        total = int(result_all.fetchone()[0]) # 全部艙位的貢獻
+        total = int(result_all.fetchone()[0]) # 全部艙位的收益
 
         for row in result.fetchall():
             rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 2)) + "%", "value" : row[1]}
@@ -1756,7 +1756,7 @@ def class_rank():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f"艙位貢獻比例"
+    response_object['message'] = f"艙位收益比例，以" + str(time) + "為單位"
     result.close()
     conn.close()
     
@@ -1793,8 +1793,8 @@ def booking():
         id = int(row[0])
 
         insert = f"""
-            INSERT INTO orders ('Date', 'PriceLevel', 'SeatID', 'CustomerID', 'FlightID', 'Amount', 'Status') 
-            VALUES ("{dep_date}", {pricelevel}, {seat}, {custID}, {id}, {amount}, "OK");
+            INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Amount, Status) 
+            VALUES ("{dep_date}", "{pricelevel}", {seat}, {custID}, {id}, {amount}, "OK");
         """
         conn.execute(text(insert))
         conn.execute(text("COMMIT;"))
