@@ -1511,6 +1511,53 @@ def CE():
     
     return jsonify(response_object)
 
+
+@app.route('/booking', methods = ['POST'])
+def booking():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    post_data = request.get_json()
+    origin = post_data.get("origin")
+    dest = post_data.get("destination")
+    dep_date = post_data.get("department_date")
+    back_date = post_data.get("back_date")
+    number = post_data.get("number")
+    seat = post_data.get("seat")
+
+    try:
+        query = f"""
+            SELECT sum(LTV) FROM customer;
+        """
+
+        result = conn.execute(text(query))
+        row = result.fetchone()
+        ce = row[0]
+
+        update = f"""
+            UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
+        """
+        conn.execute(text(update))
+        conn.execute(text("COMMIT;"))
+        # response_object['customer equity'] = CElist
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['message'] = f"成功搜尋CE"
+    result.close()
+    conn.close()
+    
+    return jsonify(response_object)
+
   
 if __name__ == "__main__":
     app.run(debug=True)
