@@ -963,7 +963,7 @@ def get_retention_rate():
             RRlist.append(dictRR)
 
         response_object['year'] = year
-        response_object['retention rate'] = RRlist
+        response_object['retention_rate'] = RRlist
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -1114,7 +1114,7 @@ def get_survival_rate():
             SRlist.append(dictSR)
 
         response_object['year'] = year
-        response_object['survival rate'] = SRlist
+        response_object['survival_rate'] = SRlist
 
 
     except Exception as e:
