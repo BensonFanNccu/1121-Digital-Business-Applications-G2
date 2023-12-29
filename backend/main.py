@@ -172,7 +172,7 @@ def set_parameter():
             return price_level
 
         priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
-        avg_price = movingAverage("2023-7-25", priceData, 5, 5)
+        avg_price = movingAverage(post_data.get("date"), priceData, 5, 5)
         model = optimize(avg_price)
 
         avaerge_daily_price = avg_price
