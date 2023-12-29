@@ -1817,7 +1817,7 @@ def class_rank():
         for row in result.fetchall():
             rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 2)) + "%", "value" : row[1]}
             rank_list.append(rankDict)
-
+        rank_list = sorted(rank_list, key = lambda x:x['class']) 
         response_object['rank'] = rank_list
 
     except Exception as e:
