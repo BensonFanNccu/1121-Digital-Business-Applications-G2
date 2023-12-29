@@ -727,10 +727,11 @@ def PCV():
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
-    
+
     try:
-        rate = 0.0125
+        rate = 0.02
         year = 2023
+
         query = f"""
             SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
             JOIN ticketprice p
@@ -739,9 +740,10 @@ def PCV():
             GROUP BY CustomerID
             ORDER BY PCV DESC;
         """
+
         past_value_data = query2dict(query, conn)
         for i in past_value_data:
-            i["PCV"] = i["PCV"]/(1+rate)
+            i["PCV"] = i["PCV"] * (1 + rate)
         
         response_object['PCV'] = past_value_data
 
@@ -764,7 +766,7 @@ def PCV():
     
     return jsonify(response_object)
 
-
+# 假定存續期間為1年
 @app.route('/LTV', methods=['GET'])
 def LTV():
     response_object = {'status': 'success'}
@@ -804,7 +806,7 @@ def LTV():
             query = f"""
                 SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                 WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30');
             """
 
             result = conn.execute(text(query))
@@ -814,9 +816,9 @@ def LTV():
             if value != None:
                 LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
             else:
-                LTV = 0
+                LTV = 0.0
 
-            dictLTV = {"CustomerID" : i, "LTV" : str(round(LTV, 5))}
+            dictLTV = {"CustomerID" : i, "LTV" : round(LTV, 4)}
             LTVlist.append(dictLTV)
         
             update = f"""
@@ -967,12 +969,13 @@ def get_retention_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1043,12 +1046,13 @@ def get_single_survival_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/31') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1118,12 +1122,13 @@ def get_survival_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1842,7 +1847,7 @@ def booking():
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     dep_date = post_data.get("department_date")
-    # back_date = post_data.get("back_date")
+    pricelevel = post_data.get("class")
     amount = post_data.get("amount")
     seat = post_data.get("seat")
 
