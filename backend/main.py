@@ -16,7 +16,7 @@ import datetime as dt
 
 db_username = 'benson'
 db_password = 'Abc123456789!'
-db_host = '34.80.114.185'
+db_host = '34.125.243.130'
 db_port = '3306'
 db_name = 'project'
 
@@ -336,7 +336,7 @@ def get_sales_rate():
                             for num in sales_num:
                                 sales += num["count"] 
                             sales_rate = sales / seat_num[0]["SeatNumber"]
-                        sales_list.append({f"{y}/{i}": sales_rate})
+                        sales_list.append(sales_rate)
                 
                 response_object['sales_rate_list'] = sales_list
 
@@ -371,7 +371,7 @@ def get_sales_rate():
                             for num in sales_num:
                                 sales += num["count"] 
                             sales_rate = sales / seat_num[0]["SeatNumber"]
-                        sales_list.append({f"{y}/{i}": sales_rate})
+                        sales_list.append(sales_rate)
                 
                 response_object['sales_rate_list'] = sales_list
 
@@ -397,7 +397,7 @@ def get_sales_rate():
                         for num in sales_num:
                             sales += num["count"] 
                         sales_rate = sales / seat_num[0]["SeatNumber"]
-                    sales_list.append({f"{y} Q{i}": sales_rate})
+                    sales_list.append(sales_rate)
                 
             response_object['sales_rate_list'] = sales_list
 
@@ -1876,6 +1876,5 @@ def booking():
     
     return jsonify(response_object)
 
-  
 if __name__ == "__main__":
     app.run(debug=True)
