@@ -1,4 +1,3 @@
-# from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_httpauth import HTTPTokenAuth
@@ -11,8 +10,6 @@ import numpy as np
 import pandas as pd
 import gurobipy as grb
 import datetime as dt
-
-# load_dotenv()
 
 db_username = 'benson'
 db_password = 'Abc123456789!'
