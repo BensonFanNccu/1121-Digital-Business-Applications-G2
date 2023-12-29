@@ -172,7 +172,7 @@ def set_parameter():
             return price_level
 
         priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
-        avg_price = movingAverage("2023-7-25", priceData, 5, 5)
+        avg_price = movingAverage(post_data.get("date"), priceData, 5, 5)
         model = optimize(avg_price)
 
         avaerge_daily_price = avg_price
@@ -727,10 +727,11 @@ def PCV():
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
-    
+
     try:
-        rate = 0.0125
+        rate = 0.02
         year = 2023
+
         query = f"""
             SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
             JOIN ticketprice p
@@ -739,9 +740,10 @@ def PCV():
             GROUP BY CustomerID
             ORDER BY PCV DESC;
         """
+
         past_value_data = query2dict(query, conn)
         for i in past_value_data:
-            i["PCV"] = i["PCV"]/(1+rate)
+            i["PCV"] = i["PCV"] * (1 + rate)
         
         response_object['PCV'] = past_value_data
 
@@ -764,7 +766,7 @@ def PCV():
     
     return jsonify(response_object)
 
-
+# 假定存續期間為1年
 @app.route('/LTV', methods=['GET'])
 def LTV():
     response_object = {'status': 'success'}
@@ -804,7 +806,7 @@ def LTV():
             query = f"""
                 SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                 WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30');
             """
 
             result = conn.execute(text(query))
@@ -814,9 +816,9 @@ def LTV():
             if value != None:
                 LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
             else:
-                LTV = 0
+                LTV = 0.0
 
-            dictLTV = {"CustomerID" : i, "LTV" : str(round(LTV, 5))}
+            dictLTV = {"CustomerID" : i, "LTV" : round(LTV, 4)}
             LTVlist.append(dictLTV)
         
             update = f"""
@@ -967,12 +969,13 @@ def get_retention_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1043,12 +1046,13 @@ def get_single_survival_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/31') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1118,12 +1122,13 @@ def get_survival_rate():
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
                     WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
-                    AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31');
+                    AND o.CustomerID in 
+                    (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/31';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1831,22 +1836,22 @@ def class_rank():
 @app.route('/booking', methods = ['POST'])
 def booking():
     response_object = {'status': 'success'}
+    post_data = request.get_json()
+
     try:
         conn = engine.connect()
     except:
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
-
-    post_data = request.get_json()
+    
+    custID = 1
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     dep_date = post_data.get("department_date")
-    # back_date = post_data.get("back_date")
+    pricelevel = post_data.get("class")
     amount = post_data.get("amount")
     seat = post_data.get("seat")
-
-    custID = 1
 
     try:
         # 抓航班ID
@@ -1870,11 +1875,75 @@ def booking():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f"成功訂位"
+    response_object['message'] = f"訂位成功"
     result.close()
     conn.close()
     
     return jsonify(response_object)
 
+
+@app.route('/booking_flight_info', methods = ['POST'])
+def booking_flight_info():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+
+    date = post_data.get("depart_date")
+
+    query = f"""
+        Select *
+        From seat
+        Where Status = 'available' AND Date = "{date}";
+    """
+
+    result = conn.execute(text(query))
+    seats = []
+    for seat in result.fetchall():
+        seats.append(seat[0])
+
+    levels = ['A', 'B', 'C', 'D', 'E']
+    for level in levels:
+        query1 = f"""
+            select sum(amount)
+            from orders
+            where PriceLevel = "{level}" AND Date = "{date}"
+        """
+
+        query2 = f"""
+            select Amount
+            from ticketprice
+            where PriceLevel = "{level}" AND Date = "{date}"
+        """
+
+        result1 = conn.execute(text(query1)).fetchone()[0]
+        result2 = conn.execute(text(query2)).fetchone()[0]
+    
+        if(int(result2) - int(result1) <=0):
+            levels.remove(level)
+
+
+    prices = []
+    for level in levels:
+        query = f"""
+            select Price
+            from ticketprice
+            where PriceLevel = "{level}" AND Date = "{date}"
+        """
+        result = conn.execute(text(query)).fetchone()[0]
+        prices.append(result)
+
+    response_object['remain_seat'] = seats
+    response_object['remain_level'] = levels
+    response_object['seat_price'] = prices
+
+    return jsonify(response_object)
+
+  
 if __name__ == "__main__":
     app.run(debug=True)
