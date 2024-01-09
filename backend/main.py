@@ -793,18 +793,6 @@ def LTV():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
 
-    current_time = datetime.now()
-    current_month = current_time.month
-
-    if current_month <= 3:
-        quarter = 1
-    elif current_month <=6:
-        quarter = 2
-    elif current_month <= 9:
-        quarter = 3
-    else:
-        quarter = 4
-
     try:
         queryCount = f"""
             SELECT count(CustomerID) FROM customer;
@@ -821,7 +809,7 @@ def LTV():
             query = f"""
                 SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                 WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30');
+                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
             """
 
             result = conn.execute(text(query))
@@ -829,7 +817,8 @@ def LTV():
             value = row[0]
 
             if value != None:
-                LTV = value * (1 - 1 / (1 + rate) ** 6) / rate
+                avg = value / 4
+                LTV = avg * (1 - 1 / (1 + rate) ** 6) / rate
             else:
                 LTV = 0.0
 
@@ -1357,30 +1346,21 @@ def get_customer_info():
             return jsonify(response_object)
     
     # get LTV
-    def get_LTV(year, rate, current_month):
-
-        if current_month <= 3:
-            quarter = 1
-        elif current_month <=6:
-            quarter = 2
-        elif current_month <= 9:
-            quarter = 3
-        else:
-            quarter = 4
+    def get_LTV(year, rate):
 
         try:
             query = f"""
                 SELECT o.CustomerID, sum(t.Price) as total_price FROM orders as o
                 JOIN ticketprice as t
                 ON o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID
-                WHERE (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30')
+                WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31')
                 GROUP BY o.CustomerID;
             """
             price_data = query2dict(query, conn)
 
             for i in price_data:
                 if i["total_price"] != None:
-                    LTV = i["total_price"] * (1 - 1 / (1 + rate) ** 6) / rate
+                    LTV = i["total_price"] / 4 * (1 - 1 / (1 + rate) ** 6) / rate
                 else:
                     LTV = 0.0
 
@@ -1405,7 +1385,6 @@ def get_customer_info():
     def get_PCV(year, rate):
         try:
             PCVlist = [[]]
-            resultList = []
 
             custquery = f"""
                 SELECT count(CustomerID) FROM customer;
@@ -1452,7 +1431,7 @@ def get_customer_info():
     current_month = current_time.month
     rate = 0.02
     get_RFM()
-    get_LTV(year, rate, current_month)
+    get_LTV(year, rate)
     get_PCV(year, rate)
 
     try:
@@ -1495,18 +1474,6 @@ def CE():
             response_object['message'] = "資料庫連線失敗"
             return jsonify(response_object)
 
-        current_time = datetime.now()
-        current_month = current_time.month
-
-        if current_month <= 3:
-            quarter = 1
-        elif current_month <=6:
-            quarter = 2
-        elif current_month <= 9:
-            quarter = 3
-        else:
-            quarter = 4
-
         try:
             queryCount = f"""
                 SELECT count(CustomerID) FROM customer;
@@ -1519,7 +1486,7 @@ def CE():
                 query = f"""
                     SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                     WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30');
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
                 """
 
                 result = conn.execute(text(query))
@@ -1527,7 +1494,7 @@ def CE():
                 value = row[0]
 
                 if value != None:
-                    LTV = value * (1 - 1 / (1 + rate) ** 6) / rate
+                    LTV = value / 4 * (1 - 1 / (1 + rate) ** 6) / rate
                 else:
                     LTV = 0
             
