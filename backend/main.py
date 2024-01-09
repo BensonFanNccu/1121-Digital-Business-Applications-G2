@@ -1226,7 +1226,7 @@ def get_left_seat():
         response_object['ordered_num'] = ordered_num
         response_object['vacant_num'] = vacant_num
         response_object['ordered_ratio'] = ratio
-        response_object['ordered_percentage_ratio'] = percentage_ratio
+        response_object['ordered_percentage_ratio'] = str(percentage_ratio) + "%"
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -1856,7 +1856,7 @@ def booking():
 
     if dup != None:
         response_object['result'] = f"duplicate"
-        response_object['message'] = f"這個座位已被預訂"
+        response_object['message'] = f"這個座位已被預訂。"
 
     else:
         try:
@@ -1882,7 +1882,7 @@ def booking():
             return jsonify(response_object)
         
         response_object['result'] = f"success"
-        response_object['message'] = f"訂位成功"
+        response_object['message'] = f"訂位成功！"
 
         result.close()
 
