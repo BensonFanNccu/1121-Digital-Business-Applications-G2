@@ -1229,13 +1229,15 @@ def get_left_seat():
         # 被預定百分比/售票狀況
         ratio = ordered_num / seatNumber
         ratio = round(ratio, 5)
+        percentage_ratio = ratio * 100
 
         response_object['date'] = date
-        response_object['ordered_seat_list'] = ordered_seat
-        response_object['vacant_list'] = vacant
+        # response_object['ordered_seat_list'] = ordered_seat
+        # response_object['vacant_list'] = vacant
         response_object['ordered_num'] = ordered_num
         response_object['vacant_num'] = vacant_num
         response_object['ordered_ratio'] = ratio
+        response_object['ordered_percentage_ratio'] = percentage_ratio
 
     except Exception as e:
         response_object['status'] = "failure"
