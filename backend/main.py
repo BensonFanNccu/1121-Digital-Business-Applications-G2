@@ -1925,7 +1925,7 @@ def booking_flight_info():
         result2 = conn.execute(text(query2)).fetchone()
         if result2 != None:
             count2 = result2[0]
-            if(int(count1) < int(count2)):
+            if(int(count1) < int(float(count2))):
                 levels.append(level)
             
     price = []
