@@ -1945,5 +1945,77 @@ def booking_flight_info():
 
     return jsonify(response_object)
 
+@app.route('/add_data', methods = ['GET'])
+def add_data():
+    from random import randint
+    import random
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    for i in range(7):
+        for month in range(1, 13):
+            random.seed(10 + i)
+            dep_date = f'2023-{month}-{randint(1,27)}'
+            pricelevel = ['A', 'B', 'C', 'D', 'E']
+            price = [7000 + randint(-100,500), 6000 + randint(-100,500), 5000 + randint(-100,500), 4000 + randint(-100,500), 3000 + randint(-100,500)]
+            seat_level_num = [20 + randint(-2,2), 30 + randint(-2,2), 50 + randint(-2,2), 0 + randint(0,2), 70 + randint(-2,2)]
+            print("---------------------------------")
+            print(i)
+            print(" ")
+            print(dep_date)
+            print(dep_date)
+            print(pricelevel)
+            print(price)
+            print(seat_level_num)
+
+            seatID = randint(1,27)
+            price_and_level = randint(0,4)
+            
+            query = f"""
+                SELECT Price as num 
+                FROM ticketprice
+                WHERE Date = '{dep_date}' AND PriceLevel = '{pricelevel[price_and_level]}';
+            """
+            num = query2dict(query, conn)
+            print(num)
+            if len(num) == 0:
+                insert = f"""
+                        INSERT ticketprice (PriceLevel, Date, FlightID, Price, Amount)
+                        VALUES ('{pricelevel[price_and_level]}', '{dep_date}', {1}, {price[price_and_level]}, {seat_level_num[price_and_level]});
+                    """
+                conn.execute(text(insert))
+                conn.execute(text("COMMIT;"))
+
+                insertOK = f"""
+                    INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Amount, Status) 
+                    VALUES ("{dep_date}", "{pricelevel[price_and_level]}", {seatID}, {i+1}, {1}, {randint(1, 2)}, "OK"); 
+                """
+                conn.execute(text(insertOK))
+                conn.execute(text("COMMIT;"))
+                
+                insertCancel = f"""
+                    INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Amount, Status) 
+                    VALUES ("{dep_date}", "{pricelevel[price_and_level]}", {seatID+1}, {i+1}, {1}, {randint(1, 2)}, "Cancel"); 
+                """
+                conn.execute(text(insertCancel))
+                conn.execute(text("COMMIT;"))
+            else:
+                update = f"""
+                    UPDATE ticketprice 
+                    SET Price = {price[price_and_level]}, Amount = {seat_level_num[price_and_level]}
+                    WHERE Date = '{dep_date}' AND PriceLevel = '{pricelevel[price_and_level]}' AND FlightID = 1;
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+            
+
+    conn.close()
+    return jsonify(response_object)
+
 if __name__ == "__main__":
     app.run(debug=True)
