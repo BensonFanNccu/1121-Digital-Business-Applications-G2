@@ -266,6 +266,7 @@ def revenue_analysis():
                     WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i}/31';
                 """
                 rev = query2dict(rev_query, conn)
+                print(f"{i}: {rev}")
                 rev_list.append(rev[0]["rev"]) 
         
         response_object['past_rev'] = rev_list
@@ -1944,6 +1945,5 @@ def booking_flight_info():
 
     return jsonify(response_object)
 
-  
 if __name__ == "__main__":
     app.run(debug=True)
