@@ -1,9 +1,6 @@
-# from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_httpauth import HTTPTokenAuth
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import *
 
@@ -11,8 +8,7 @@ import numpy as np
 import pandas as pd
 import gurobipy as grb
 import datetime as dt
-
-# load_dotenv()
+import random
 
 db_username = 'benson'
 db_password = 'Abc123456789!'
@@ -732,29 +728,46 @@ def PCV():
     try:
         rate = 0.02
         year = 2023
+        PCVlist = [[]]
+        resultList = []
 
-        query = f"""
-            SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
-            JOIN ticketprice p
-            ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-            WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/12/31'
-            GROUP BY CustomerID
-            ORDER BY PCV DESC;
+        custquery = f"""
+            SELECT count(CustomerID) FROM customer;
         """
+        custResult = conn.execute(text(custquery))
+        custNum = int(custResult.fetchone()[0])
 
-        past_value_data = query2dict(query, conn)
-        for i in past_value_data:
-            i["PCV"] = i["PCV"] * (1 + rate)
-        
-        response_object['PCV'] = past_value_data
+        for i in range(custNum - 1):
+            PCVlist.append([])
 
-        #寫入資料庫
-        for i in past_value_data:
+        for qtr in range(1, 5):
+            query = f"""
+                SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
+                JOIN ticketprice p ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                WHERE o.Date BETWEEN '{year}/{qtr * 3 - 2}/1' AND '{year}/{qtr * 3}/30'
+                GROUP BY CustomerID;
+            """
+
+            result = conn.execute(text(query))
+
+            for row in result.fetchall():
+                id = int(row[0])
+                value = float(int(row[1]) * ((1 + rate) ** (4 - qtr)))
+                PCVlist[id - 1].append(value)
+
+        for j in range(len(PCVlist)):
+            pcv = float(sum(PCVlist[j]))
+            dictPCV = {"CustomerID" : j + 1, "PCV" : pcv}
+            resultList.append(dictPCV)
+
+            #寫入資料庫 
             update = f"""
-                UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
+                UPDATE customer SET PCV = {pcv} WHERE CustomerID = {j + 1}; 
             """
             conn.execute(text(update))
             conn.execute(text("COMMIT;"))
+        
+        response_object['PCV'] = resultList
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -762,12 +775,14 @@ def PCV():
         print(str(e))
         return jsonify(response_object)
     
-    response_object['message'] = f""
+    response_object['message'] = f"成功算出PCV"
+    custResult.close()
+    result.close()
     conn.close()
     
     return jsonify(response_object)
 
-# 假定存續期間為1年
+# 假定存續期間為1.5年
 @app.route('/LTV', methods=['GET'])
 def LTV():
     response_object = {'status': 'success'}
@@ -779,21 +794,9 @@ def LTV():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
 
-    current_time = datetime.now()
-    current_month = current_time.month
-
-    if current_month <= 3:
-        quarter = 1
-    elif current_month <=6:
-        quarter = 2
-    elif current_month <= 9:
-        quarter = 3
-    else:
-        quarter = 4
-
     try:
         queryCount = f"""
-            SELECT count(CustomerID) AS count FROM customer;
+            SELECT count(CustomerID) FROM customer;
         """
         countResult = conn.execute(text(queryCount))
         cRow = countResult.fetchone()
@@ -807,7 +810,7 @@ def LTV():
             query = f"""
                 SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                 WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30');
+                AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
             """
 
             result = conn.execute(text(query))
@@ -815,11 +818,12 @@ def LTV():
             value = row[0]
 
             if value != None:
-                LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
+                avg = value / 4
+                LTV = avg * (1 - 1 / (1 + rate) ** 6) / rate
             else:
                 LTV = 0.0
 
-            dictLTV = {"CustomerID" : i, "LTV" : round(LTV, 4)}
+            dictLTV = {"CustomerID" : i, "LTV" : LTV}
             LTVlist.append(dictLTV)
         
             update = f"""
@@ -1214,13 +1218,16 @@ def get_left_seat():
 
         # 被預定百分比/售票狀況
         ratio = ordered_num / seatNumber
-        ratio = round(ratio, 4)
+        ratio = round(ratio, 5)
+        percentage_ratio = ratio * 100
 
-        response_object['ordered_seat_list'] = ordered_seat
-        response_object['vacant_list'] = vacant
+        response_object['date'] = date
+        # response_object['ordered_seat_list'] = ordered_seat
+        # response_object['vacant_list'] = vacant
         response_object['ordered_num'] = ordered_num
         response_object['vacant_num'] = vacant_num
         response_object['ordered_ratio'] = ratio
+        response_object['ordered_percentage_ratio'] = str(percentage_ratio) + "%"
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -1284,7 +1291,7 @@ def get_customer_info():
             print(recency_data)
 
             #Frequency
-            year = "2023"
+            year = 2023
             frequency_query = f"""
                 SELECT CustomerID, COUNT(OrderID) AS frequency FROM orders
                 WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
@@ -1340,32 +1347,23 @@ def get_customer_info():
             return jsonify(response_object)
     
     # get LTV
-    def get_LTV(year, rate, current_month):
-
-        if current_month <= 3:
-            quarter = 1
-        elif current_month <=6:
-            quarter = 2
-        elif current_month <= 9:
-            quarter = 3
-        else:
-            quarter = 4
+    def get_LTV(year, rate):
 
         try:
             query = f"""
                 SELECT o.CustomerID, sum(t.Price) as total_price FROM orders as o
                 JOIN ticketprice as t
                 ON o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID
-                WHERE (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31')
+                WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31')
                 GROUP BY o.CustomerID;
             """
             price_data = query2dict(query, conn)
 
             for i in price_data:
                 if i["total_price"] != None:
-                    LTV = i["total_price"] * (1 - 1 / (1 + rate) ** 4) / rate
+                    LTV = i["total_price"] / 4 * (1 - 1 / (1 + rate) ** 6) / rate
                 else:
-                    LTV = 0
+                    LTV = 0.0
 
                 # for j in customer_info_list:
                 #     if j["CustomerID"] == i["CustomerID"]:
@@ -1387,25 +1385,36 @@ def get_customer_info():
     # PCV
     def get_PCV(year, rate):
         try:
-            query = f"""
-                SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
-                JOIN ticketprice p
-                ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-                JOIN customer
-                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/12/31'
-                GROUP BY CustomerID
-                ORDER BY PCV DESC;
-            """
-            past_value_data = query2dict(query, conn)
-            for i in past_value_data:
-                i["PCV"] = i["PCV"]/(1+rate)
-                # for j in customer_info_list:
-                #     if j["CustomerID"] == i["CustomerID"]:
-                #         j["PCV"] = i["PCV"]
+            PCVlist = [[]]
 
-            #寫入資料庫
+            custquery = f"""
+                SELECT count(CustomerID) FROM customer;
+            """
+            custResult = conn.execute(text(custquery))
+            custNum = int(custResult.fetchone()[0])
+
+            for i in range(custNum - 1):
+                PCVlist.append([])
+
+            for qtr in range(1, 5):
+                query = f"""
+                    SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
+                    JOIN ticketprice p ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                    WHERE o.Date BETWEEN '{year}/{qtr * 3 - 2}/1' AND '{year}/{qtr * 3}/30'
+                    GROUP BY CustomerID;
+                """
+
+                result = conn.execute(text(query))
+
+                for row in result.fetchall():
+                    id = int(row[0])
+                    value = float(int(row[1]) * ((1 + rate) ** (4 - qtr)))
+                    PCVlist[id - 1].append(value)
+
+            for j in range(len(PCVlist)):
+                pcv = float(sum(PCVlist[j]))
                 update = f"""
-                    UPDATE customer SET PCV = {i["PCV"]} WHERE CustomerID = {i["CustomerID"]} 
+                    UPDATE customer SET PCV = {pcv} WHERE CustomerID = {j + 1}; 
                 """
                 conn.execute(text(update))
                 conn.execute(text("COMMIT;"))
@@ -1413,19 +1422,18 @@ def get_customer_info():
         except Exception as e:
             response_object['status'] = "failure"
             response_object['message'] = str(e)
-            print(str(e))
             return jsonify(response_object)
         
     
     # 最後執行
     current_time = datetime.now()
-    year = current_time.year
+    # year = current_time.year
+    year = 2023
     current_month = current_time.month
-    past_rate = 0.0125
-    future_rate = 0.02
+    rate = 0.02
     get_RFM()
-    get_LTV(year, future_rate, current_month)
-    get_PCV(year, past_rate)
+    get_LTV(year, rate)
+    get_PCV(year, rate)
 
     try:
         query = f"""
@@ -1467,21 +1475,9 @@ def CE():
             response_object['message'] = "資料庫連線失敗"
             return jsonify(response_object)
 
-        current_time = datetime.now()
-        current_month = current_time.month
-
-        if current_month <= 3:
-            quarter = 1
-        elif current_month <=6:
-            quarter = 2
-        elif current_month <= 9:
-            quarter = 3
-        else:
-            quarter = 4
-
         try:
             queryCount = f"""
-                SELECT count(CustomerID) AS count FROM customer;
+                SELECT count(CustomerID) FROM customer;
             """
             countResult = conn.execute(text(queryCount))
             cRow = countResult.fetchone()
@@ -1491,7 +1487,7 @@ def CE():
                 query = f"""
                     SELECT sum(t.Price) FROM orders as o, ticketprice as t 
                     WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
-                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31');
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
                 """
 
                 result = conn.execute(text(query))
@@ -1499,7 +1495,7 @@ def CE():
                 value = row[0]
 
                 if value != None:
-                    LTV = value * (1 - 1 / (1 + rate) ** 4) / rate
+                    LTV = value / 4 * (1 - 1 / (1 + rate) ** 6) / rate
                 else:
                     LTV = 0
             
@@ -1561,7 +1557,7 @@ def region_rank():
     time = post_data.get("time")
     rank_list = []
     current_time = datetime.now()
-    year = current_time.year
+    year = 2023
     month = current_time.month
     day = current_time.day
 
@@ -1569,7 +1565,7 @@ def region_rank():
         if time == "週":
             if day > 7:
                 query = f"""
-                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}' 
@@ -1577,14 +1573,14 @@ def region_rank():
                 """
 
                 query_all = f"""
-                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}';
                 """
 
             elif day == 1:
                 query = f"""
-                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30' 
@@ -1592,14 +1588,14 @@ def region_rank():
                 """
 
                 query_all = f"""
-                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30';
                 """
 
             else:
                 query = f"""
-                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                    SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}' 
@@ -1607,14 +1603,14 @@ def region_rank():
                 """
 
                 query_all = f"""
-                    SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                    SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                     WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
                 """
 
         elif time == "月":
             query = f"""
-                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30' 
@@ -1622,7 +1618,7 @@ def region_rank():
             """
 
             query_all = f"""
-                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30';
             """
@@ -1638,7 +1634,7 @@ def region_rank():
                 quarter = 4
 
             query = f"""
-                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30' 
@@ -1646,14 +1642,14 @@ def region_rank():
             """
 
             query_all = f"""
-                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30';
             """
             
         elif time == "年":
             query = f"""
-                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/1/1' AND '{year}/12/31' 
@@ -1661,21 +1657,21 @@ def region_rank():
             """
 
             query_all = f"""
-                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/1/1' AND '{year}/12/31';
             """
 
         else:  # 全部(不篩時間)，保險用
             query = f"""
-                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price * o.Amount) AS Total FROM customer c
+                SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK' GROUP BY City ORDER BY Total DESC LIMIT 5;
             """
 
             query_all = f"""
-                SELECT SUM(t.Price * o.Amount) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
+                SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
                 WHERE o.Status = 'OK';
             """
@@ -1688,12 +1684,12 @@ def region_rank():
         sum = 0
         for row in result.fetchall():
             ratio = int(row[1]) / total
-            rankDict = {"rank" : str(i), "region" : row[0], "rate" : str(round(ratio * 100, 2)) + "%", "value" : row[1]}
+            rankDict = {"rank" : i, "region" : row[0], "rate" : str(round(ratio * 100, 3)) + "%", "value" : row[1]}
             rank_list.append(rankDict)
             sum += int(row[1])
             i += 1
 
-        rest = {"rank" : "6", "region" : "其他", "rate" : str(round((total - sum) / total * 100, 2)) + "%", "value" : float(total - sum)}
+        rest = {"rank" : 6, "region" : "其他", "rate" : str(round((total - sum) / total * 100, 3)) + "%", "value" : float(total - sum)}
         rank_list.append(rest)
 
         response_object['rank'] = rank_list
@@ -1726,7 +1722,7 @@ def class_rank():
     time = post_data.get("time")
     rank_list = []
     current_time = datetime.now()
-    year = current_time.year
+    year = 2023
     month = current_time.month
     day = current_time.day
     # day = 8
@@ -1816,7 +1812,7 @@ def class_rank():
         total = int(result_all.fetchone()[0]) # 全部艙位的收益
 
         for row in result.fetchall():
-            rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 2)) + "%", "value" : row[1]}
+            rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 3)) + "%", "value" : row[1]}
             rank_list.append(rankDict)
         rank_list = sorted(rank_list, key = lambda x:x['class']) 
         response_object['rank'] = rank_list
@@ -1846,38 +1842,52 @@ def booking():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
-    custID = 1
+    custID = random.randint(1,7)
     origin = post_data.get("origin")
     dest = post_data.get("destination")
-    dep_date = post_data.get("department_date")
+    date = post_data.get("department_date")
     pricelevel = post_data.get("class")
-    amount = post_data.get("amount")
     seat = post_data.get("seat")
 
-    try:
-        # 抓航班ID
-        query = f"""
-            SELECT FlightID FROM flight WHERE Origin = '{origin}' AND Destination = '{dest}';
-        """
-        result = conn.execute(text(query))
-        row = result.fetchone()
-        id = int(row[0])
+    chkquery = f"""
+        SELECT OrderID FROM orders WHERE Date = '{date}' AND SeatID = '{seat}';
+    """
+    chkResult = conn.execute(text(chkquery))
+    dup = chkResult.fetchone()
 
-        insert = f"""
-            INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Amount, Status) 
-            VALUES ("{dep_date}", "{pricelevel}", {seat}, {custID}, {id}, {amount}, "OK");
-        """
-        conn.execute(text(insert))
-        conn.execute(text("COMMIT;"))
+    if dup != None:
+        response_object['result'] = f"duplicate"
+        response_object['message'] = f"這個座位已被預訂。"
 
-    except Exception as e:
-        response_object['status'] = "failure"
-        response_object['message'] = str(e)
-        print(str(e))
-        return jsonify(response_object)
-    
-    response_object['message'] = f"訂位成功"
-    result.close()
+    else:
+        try:
+            # 抓航班ID
+            query = f"""
+                SELECT FlightID FROM flight WHERE Origin = '{origin}' AND Destination = '{dest}';
+            """
+            result = conn.execute(text(query))
+            row = result.fetchone()
+            id = int(row[0])
+
+            insert = f"""
+                INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Status) 
+                VALUES ("{date}", "{pricelevel}", {seat}, {custID}, {id}, "OK");
+            """
+            conn.execute(text(insert))
+            conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            response_object['status'] = "failure"
+            response_object['message'] = str(e)
+            print(str(e))
+            return jsonify(response_object)
+        
+        response_object['result'] = f"success"
+        response_object['message'] = f"訂位成功！"
+
+        result.close()
+
+    chkResult.close()  
     conn.close()
     
     return jsonify(response_object)
@@ -1886,7 +1896,6 @@ def booking():
 @app.route('/booking_flight_info', methods = ['POST'])
 def booking_flight_info():
     response_object = {'status': 'success'}
-    post_data = request.get_json()
 
     try:
         conn = engine.connect()
@@ -1895,53 +1904,43 @@ def booking_flight_info():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
 
+    post_data = request.get_json()
     date = post_data.get("depart_date")
 
-    query = f"""
-        Select *
-        From seat
-        Where Status = 'available' AND Date = "{date}";
-    """
-
-    result = conn.execute(text(query))
-    seats = []
-    for seat in result.fetchall():
-        seats.append(seat[0])
-
-    levels = ['A', 'B', 'C', 'D', 'E']
-    for level in levels:
+    alllevels = ['A', 'B', 'C', 'D', 'E']
+    levels = []
+    for level in alllevels:
         query1 = f"""
-            select sum(amount)
+            select count(OrderID)
             from orders
-            where PriceLevel = "{level}" AND Date = "{date}"
+            where PriceLevel = "{level}" AND Date = "{date}";
         """
 
         query2 = f"""
             select Amount
             from ticketprice
-            where PriceLevel = "{level}" AND Date = "{date}"
+            where PriceLevel = "{level}" AND Date = "{date}";
         """
 
-        result1 = conn.execute(text(query1)).fetchone()[0]
-        result2 = conn.execute(text(query2)).fetchone()[0]
-    
-        if(int(result2) - int(result1) <=0):
-            levels.remove(level)
-
-
-    prices = []
+        count1 = conn.execute(text(query1)).fetchone()[0]
+        result2 = conn.execute(text(query2)).fetchone()
+        if result2 != None:
+            count2 = result2[0]
+            if(int(count1) < int(float(count2))):
+                levels.append(level)
+            
+    price = []
     for level in levels:
         query = f"""
             select Price
             from ticketprice
-            where PriceLevel = "{level}" AND Date = "{date}"
+            where PriceLevel = "{level}" AND Date = "{date}";
         """
         result = conn.execute(text(query)).fetchone()[0]
-        prices.append(result)
+        price.append(result)
 
-    response_object['remain_seat'] = seats
-    response_object['remain_level'] = levels
-    response_object['seat_price'] = prices
+    response_object['remain_price_level'] = levels
+    response_object['seat_price'] = price
 
     return jsonify(response_object)
 
