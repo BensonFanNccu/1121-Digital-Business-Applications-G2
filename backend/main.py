@@ -1842,12 +1842,18 @@ def booking():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
-    custID = random.randint(1,7)
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     date = post_data.get("department_date")
     pricelevel = post_data.get("class")
     seat = post_data.get("seat")
+   
+    custquery = f"""
+            SELECT count(CustomerID) FROM customer;
+        """
+    custResult = conn.execute(text(custquery))
+    custNum = int(custResult.fetchone()[0])
+    custID = random.randint(1, custNum)
 
     chkquery = f"""
         SELECT OrderID FROM orders WHERE Date = '{date}' AND SeatID = '{seat}';
