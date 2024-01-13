@@ -352,7 +352,7 @@ def get_sales_rate():
         return jsonify(response_object)
     
     post_data = request.get_json()
-    flight_code = post_data.get("flight_code")
+    flight_code = "MM620"
     time = post_data.get("time")
     year = ['2023']
     
