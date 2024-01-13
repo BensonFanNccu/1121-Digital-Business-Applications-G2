@@ -16,7 +16,7 @@ import datetime as dt
 
 db_username = 'benson'
 db_password = 'Abc123456789!'
-db_host = '34.80.114.185'
+db_host = '34.125.243.130'
 db_port = '3306'
 db_name = 'project'
 
