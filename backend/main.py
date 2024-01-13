@@ -2127,8 +2127,8 @@ def booking_flight_info():
         price.append(result)
 
     for i in range(len(price)):
-        resDict = {levels[i] : int(price[i])}
-        resultList.append(resDict)
+        string = levels[i] + ", " + str(int(price[i])) + "元"
+        resultList.append(string)
     
     response_object['class_and_price'] = resultList
 
