@@ -1750,7 +1750,8 @@ def region_rank():
     rank_list = []
     current_time = datetime.now()
     year = 2023
-    month = current_time.month
+    # month = current_time.month
+    month = 12
     day = current_time.day
 
     try:
@@ -1805,14 +1806,14 @@ def region_rank():
                 SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30' 
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31' 
                 GROUP BY City ORDER BY Total DESC LIMIT 5;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30';
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31';
             """
 
         elif time == "季":
@@ -1829,14 +1830,14 @@ def region_rank():
                 SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30' 
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31' 
                 GROUP BY City ORDER BY Total DESC LIMIT 5;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30';
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31';
             """
             
         elif time == "年":
@@ -1916,7 +1917,8 @@ def class_rank():
     rank_list = []
     current_time = datetime.now()
     year = 2023
-    month = current_time.month
+    # month = current_time.month
+    month = 12
     day = current_time.day
     # day = 8
 
@@ -1958,13 +1960,13 @@ def class_rank():
         elif time == "月":
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31'
                 GROUP BY t.PriceLevel ORDER BY Total DESC;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31'
             """
 
         elif time == "季":
@@ -1979,13 +1981,13 @@ def class_rank():
 
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31'
                 GROUP BY t.PriceLevel ORDER BY Total DESC;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31'
             """
             
         else: # 單日
