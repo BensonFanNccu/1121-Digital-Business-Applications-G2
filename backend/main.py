@@ -934,46 +934,46 @@ def get_single_retention_rate():
         if period == 1:
             query_curyr = f"""
                 SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') AND Status = 'OK' 
                 AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
             """
 
             query_lastyr = f"""
                 SELECT count(distinct(o.CustomerId)) FROM orders o
-                WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31' AND Status = 'OK' ;
             """
         
         elif period == 2:
             query_curyr = f"""
                 SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                WHERE (o.Date BETWEEN '{year}/4/1' AND '{year}/6/30') 
+                WHERE (o.Date BETWEEN '{year}/4/1' AND '{year}/6/30') AND Status = 'OK' 
                 AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/1/1' AND '{year}/3/31');
             """
             query_lastyr = f"""
                 SELECT count(distinct(o.CustomerId)) FROM orders o
-                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/3/31';
+                WHERE o.Date BETWEEN '{year}/1/1' AND '{year}/3/31' AND Status = 'OK' ;
             """
 
         elif period == 3:
             query_curyr = f"""
                 SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                WHERE (o.Date BETWEEN '{year}/7/1' AND '{year}/9/30') 
+                WHERE (o.Date BETWEEN '{year}/7/1' AND '{year}/9/30') AND Status = 'OK' 
                 AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/4/1' AND '{year}/6/30');
             """
             query_lastyr = f"""
                 SELECT count(distinct(o.CustomerId)) FROM orders o
-                WHERE o.Date BETWEEN '{year}/4/1' AND '{year}/6/30';
+                WHERE o.Date BETWEEN '{year}/4/1' AND '{year}/6/30' AND Status = 'OK' ;
             """
 
         else:
             query_curyr = f"""
                 SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                WHERE (o.Date BETWEEN '{year}/10/1' AND '{year}/12/31') 
+                WHERE (o.Date BETWEEN '{year}/10/1' AND '{year}/12/31') AND Status = 'OK' 
                 AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/7/1' AND '{year}/9/30');
             """
             query_lastyr = f"""
                 SELECT count(distinct(o.CustomerId)) FROM orders o
-                WHERE o.Date BETWEEN '{year}/7/1' AND '{year}/9/30';
+                WHERE o.Date BETWEEN '{year}/7/1' AND '{year}/9/30' AND Status = 'OK' ;
             """
 
         result_cur = conn.execute(text(query_curyr))
@@ -1028,26 +1028,26 @@ def get_retention_rate():
             if i == 1:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') AND Status = 'OK' 
                     AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31' AND Status = 'OK';
                 """
 
             else:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') AND Status = 'OK' 
                     AND o.CustomerID in 
                     (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30' AND Status = 'OK' ;
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1106,25 +1106,25 @@ def get_single_survival_rate():
             if i == 1:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') AND Status = 'OK' 
                     AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31' AND Status = 'OK' ;
                 """
             else:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/31') 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/31') AND Status = 'OK' 
                     AND o.CustomerID in 
                     (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30' AND Status = 'OK' ;
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1181,26 +1181,26 @@ def get_survival_rate():
             if i == 1:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') 
+                    WHERE (o.Date BETWEEN '{year}/1/1' AND '{year}/3/31') AND Status = 'OK' 
                     AND o.CustomerID in (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31';
+                    WHERE o.Date BETWEEN '{year - 1}/10/1' AND '{year - 1}/12/31' AND Status = 'OK' ;
                 """
 
             else:
                 query_curyr = f"""
                     SELECT count(distinct(o.CustomerID)) FROM orders as o 
-                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') 
+                    WHERE (o.Date BETWEEN '{year}/{i * 3 - 2}/1' AND '{year}/{i * 3}/30') AND Status = 'OK' 
                     AND o.CustomerID in 
                     (SELECT ol.CustomerID FROM orders ol WHERE ol.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30');
                 """
 
                 query_lastyr = f"""
                     SELECT count(distinct(o.CustomerId)) FROM orders o
-                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30';
+                    WHERE o.Date BETWEEN '{year}/{i * 3 - 5}/1' AND '{year}/{i * 3 - 3}/30' AND Status = 'OK' ;
                 """
 
             result_cur = conn.execute(text(query_curyr))
@@ -1553,10 +1553,10 @@ def get_customer_info():
         
     
     # 最後執行
-    current_time = datetime.now()
+    # current_time = datetime.now()
     # year = current_time.year
     year = 2023
-    current_month = current_time.month
+    # current_month = current_time.month
     rate = 0.02
     get_RFM()
     get_LTV(year, rate)
@@ -1682,6 +1682,7 @@ def region_rank():
     
     post_data = request.get_json()
     time = post_data.get("time")
+
     rank_list = []
     current_time = datetime.now()
     year = 2023
@@ -1847,6 +1848,7 @@ def class_rank():
     
     post_data = request.get_json()
     time = post_data.get("time")
+
     rank_list = []
     current_time = datetime.now()
     year = 2023
@@ -1969,12 +1971,18 @@ def booking():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
-    custID = random.randint(1,7)
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     date = post_data.get("department_date")
     pricelevel = post_data.get("class")
     seat = post_data.get("seat")
+   
+    custquery = f"""
+            SELECT count(CustomerID) FROM customer;
+        """
+    custResult = conn.execute(text(custquery))
+    custNum = int(custResult.fetchone()[0])
+    custID = random.randint(1, custNum)
 
     chkquery = f"""
         SELECT OrderID FROM orders WHERE Date = '{date}' AND SeatID = '{seat}';
