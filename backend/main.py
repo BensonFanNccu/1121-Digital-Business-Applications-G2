@@ -40,38 +40,9 @@ def query2dict(query, conn):
     data = [dict(zip(keys, row)) for row in result.fetchall()]
     return data
 
-#模型相關
-@app.route('/set_parameter', methods=['POST'])
-def set_parameter():
-    response_object = {'status': 'success'}
-    
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
-    
-    post_data = request.get_json()
+#模型參數設定
 
-    try:
-        #寫入資料庫
-        
-        insert = f"""
-            INSERT INTO modelparameter (Date, Demand, AbsentRate, FlightID)
-            VALUES ('{post_data.get("date")}', {post_data.get("demand")}, {post_data.get("AbsentRate")}, {post_data.get("flight_id")}); 
-        """
-        conn.execute(text(insert))
-        conn.execute(text("COMMIT;"))
-
-    except Exception as e:
-        response_object['status'] = "failure"
-        response_object['message'] = str(e)
-        print(str(e))
-        return jsonify(response_object)
-    
-    try:
-        def movingAverage(date, Pdata, extraPeriod, n):
+def movingAverage(date, Pdata, extraPeriod, n):
             predict_date = date.split("-")
             period = dt.date(int(predict_date[0]), int(predict_date[1]), int(predict_date[2])) - dt.date(2023, 2, 1)
             period = period.days
@@ -94,7 +65,7 @@ def set_parameter():
             return forecast[period]
         
 
-        def optimize(avg_Price):
+def optimize(avg_Price):
             mSeat = grb.Model('Seat')
             seat_vars = {}
             order_vars = {}
@@ -148,9 +119,8 @@ def set_parameter():
             mSeat.optimize()
 
             return mSeat
-        
-        
-        def getSeatLevel(model):
+
+def getSeatLevel(model):
             vars = model.getVars()
             seat_level = []
             for i in range(0,5):
@@ -159,7 +129,7 @@ def set_parameter():
             return seat_level
         
         
-        def getPriceLevel(model):
+def getPriceLevel(model):
             vars = model.getVars()
             price_level = []
             for i in range(5,10):
@@ -167,7 +137,39 @@ def set_parameter():
 
             return price_level
 
-        priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')
+priceData = pd.read_csv("Ticket_Price.csv", encoding='unicode_escape')       
+        
+#模型相關
+@app.route('/set_parameter', methods=['POST'])
+def set_parameter():
+    response_object = {'status': 'success'}
+    
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    post_data = request.get_json()
+
+    try:
+        #寫入資料庫
+        
+        insert = f"""
+            INSERT INTO modelparameter (Date, Demand, AbsentRate, FlightID)
+            VALUES ('{post_data.get("date")}', {post_data.get("demand")}, {post_data.get("AbsentRate")}, {post_data.get("flight_id")}); 
+        """
+        conn.execute(text(insert))
+        conn.execute(text("COMMIT;"))
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    try:       
         avg_price = movingAverage(post_data.get("date"), priceData, 5, 5)
         model = optimize(avg_price)
 
@@ -228,42 +230,85 @@ def set_parameter():
 def revenue_analysis():
     response_object = {'status': 'success'}
     
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
+    # try:
+    #     conn = engine.connect()
+    # except:
+    #     response_object['status'] = "failure"
+    #     response_object['message'] = "資料庫連線失敗"
+    #     return jsonify(response_object)
     
     post_data = request.get_json()
     time = post_data.get('time')
+    init_date = dt.datetime.strptime("2023-02-01", "%Y-%m-%d")
+    final_date = dt.datetime.strptime("2024-01-31", "%Y-%m-%d")
+    total_days = int((final_date - init_date).days)
+    # print(total_days)
+    present_date = init_date
+    result = []
     try:
+        for i in range(total_days):
+            avg_price = movingAverage(present_date.strftime("%Y-%m-%d"), priceData, 5, 5)
+            model = optimize(avg_price)
+            seat_level_num = getSeatLevel(model)
+            price_level = getPriceLevel(model)
+            
+            result.append(
+                {
+                    "date":present_date,
+                    "rev":sum(np.multiply(seat_level_num, price_level))
+                }
+            )
+            present_date = present_date + dt.timedelta(days=1)
+        # print(result)
+        # print(result[0]["date"].month)    
+        r = 0
         
-        #現有收益
-        year = 2023
-        rev_list = []
         if time == "季":
-            q = [1, 4, 7, 10]           
-            for i in q:
-                rev_query = f"""
-                    SELECT SUM(p.Price) AS rev FROM orders o
-                    JOIN ticketprice p
-                    ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-                    WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i+2}/31';
-                """
-                rev = query2dict(rev_query, conn)
-                rev_list.append(rev[0]["rev"])
+            rev_list = [0, 0, 0, 0]
+            for i in result:
+                if int(i["date"].month) < 4:
+                    rev_list[0] += i["rev"]
+                elif int(i["date"].month) < 7:
+                    rev_list[1] += i["rev"]
+                elif int(i["date"].month) < 10:
+                    rev_list[2] += i["rev"]
+                else:
+                    rev_list[3] += i["rev"]
         elif time == "月":
-            for i in range(1, 13):
-                rev_query = f"""
-                    SELECT SUM(p.Price) AS rev FROM orders o
-                    JOIN ticketprice p
-                    ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
-                    WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i}/31';
-                """
-                rev = query2dict(rev_query, conn)
-                print(f"{i}: {rev}")
-                rev_list.append(rev[0]["rev"]) 
+            rev_list = [0]*12
+            for i in result:
+                rev_list[(int(i["date"].month) - 1)] += i["rev"]
+            
+        # print(avaerge_daily_price)
+        # print(seat_level_num)
+        # print(price_level)
+        # print(sum(np.multiply(seat_level_num, price_level)))
+
+        #現有收益
+        # year = 2023
+        # rev_list = []
+        # if time == "季":
+        #     q = [1, 4, 7, 10]           
+        #     for i in q:
+        #         rev_query = f"""
+        #             SELECT SUM(p.Price) AS rev FROM orders o
+        #             JOIN ticketprice p
+        #             ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+        #             WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i+2}/31';
+        #         """
+        #         rev = query2dict(rev_query, conn)
+        #         rev_list.append(rev[0]["rev"])
+        # elif time == "月":
+        #     for i in range(1, 13):
+        #         rev_query = f"""
+        #             SELECT SUM(p.Price) AS rev FROM orders o
+        #             JOIN ticketprice p
+        #             ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+        #             WHERE o.Date BETWEEN '{year}/{i}/1' AND '{year}/{i}/31';
+        #         """
+        #         rev = query2dict(rev_query, conn)
+        #         print(f"{i}: {rev}")
+        #         rev_list.append(rev[0]["rev"]) 
         
         response_object['past_rev'] = rev_list
 
@@ -274,7 +319,7 @@ def revenue_analysis():
         return jsonify(response_object)
     
     response_object['message'] = f"搜尋成功"
-    conn.close()
+    # conn.close()
     
     return jsonify(response_object)
 
@@ -1250,21 +1295,24 @@ def get_left_seat():
         return jsonify(response_object)
     
     post_data = request.get_json()
-    flightID = post_data.get("flightID")
+    flightcode = post_data.get("flight_code")
     date = post_data.get("date")
     
     try:
-        # 抓座位數
+        query_ID = f"""
+            SELECT FlightID FROM flight WHERE FlightCode = "{flightcode}"; 
+        """
+        result_ID = conn.execute(text(query_ID))
+        flightID = int(result_ID.fetchone()[0])
+
         querySeat = f"""
             SELECT a.SeatNumber FROM flight as f, airplanetype as a 
             WHERE f.AirplaneTypeID = a.AirplaneTypeID AND f.FlightID = {flightID};
         """
-
         result_seat = conn.execute(text(querySeat))
         row_seat = result_seat.fetchone()
         seatNumber = int(row_seat[0])
 
-        # 獲取哪些座位被預訂
         query = f"""
             SELECT o.SeatID FROM orders o WHERE o.FlightID = {flightID} AND o.Date = "{date}" AND o.Status = 'OK';
         """
@@ -1273,8 +1321,7 @@ def get_left_seat():
         ordered_seat = []
         for row in result.fetchall():
             ordered_seat.append(int(row[0]))
-
-        # 獲取尚未被預訂的座位
+        
         vacant = []
         for i in range(1, seatNumber + 1):
             if(i in ordered_seat) == False:
