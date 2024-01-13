@@ -1,0 +1,4 @@
+Collecting gurobipy
+  Downloading gurobipy-11.0.0-cp38-cp38-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (13.3 MB)
+Installing collected packages: gurobipy
+Successfully installed gurobipy-11.0.0
