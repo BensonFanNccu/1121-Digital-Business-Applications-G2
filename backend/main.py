@@ -190,7 +190,7 @@ def set_parameter():
         query = f"""
                 SELECT Price as num 
                 FROM ticketprice
-                WHERE Date = '{today}';
+                WHERE Date = '{post_data.get("date")}';
             """
         num = query2dict(query, conn)
         print(num)
@@ -215,7 +215,7 @@ def set_parameter():
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
-        print(str(e))
+        print(e)
         return jsonify(response_object)
     
     response_object['message'] = f"參數設定成功"
@@ -617,23 +617,37 @@ def RFM():
         return jsonify(response_object)
     
     try:
-        # RFM
-
         #設定分數
-        def level(data, name):
+        def level(data, name, value):
             for i in range(len(data)):
                 if i <= len(data) * 0.2:
-                    data[i][name] = 5
+                    data[i][name] = 5                        
                 elif i <= len(data) * 0.4:
                     data[i][name] = 4
+                    boundary_high = data[i][value]
                 elif i <= len(data) * 0.6:
                     data[i][name] = 3
                 elif i <= len(data) * 0.8:
                     data[i][name] = 2
+                    boundary_low = data[i][value]
                 elif i <= len(data):
                     data[i][name] = 1
             data = sorted(data, key = lambda x:x['CustomerID']) 
-            return data
+            return data, boundary_high, boundary_low
+            
+        def segmentation(recency_data, frequency_data, monetary_data):
+            cus_type = ""
+                
+            if (recency_data > 3)&(frequency_data > 3)&(monetary_data > 3):
+                cus_type = "import_customer"
+            elif (recency_data > 1)&(frequency_data > 1)&(monetary_data > 1):
+                cus_type = "general_customer"
+            else:
+                cus_type = "sleeping_customer"
+            return cus_type
+        
+        def num_of_days(date):  
+            return (dt.datetime.today() - dt.datetime.strptime(str(date), "%Y-%m-%d")).days
         
         #設定權重
         recency_weight = 0.3
@@ -644,14 +658,15 @@ def RFM():
         recency_query = f"""
             SELECT CustomerID, MAX(Date) AS recent_date FROM orders
             GROUP BY CustomerID
-            ORDER BY recent_date;
+            ORDER BY recent_date DESC;
         """
         recency_data = query2dict(recency_query, conn)
-        recency_data = level(recency_data, "recency_level") 
+        print(recency_data)
+        recency_data, r_high_bound, r_low_bound = level(recency_data, "recency_level", "recent_date") 
         print(recency_data)
 
         #Frequency
-        year = "2023"
+        year = 2023
         frequency_query = f"""
             SELECT CustomerID, COUNT(OrderID) AS frequency FROM orders
             WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
@@ -659,9 +674,10 @@ def RFM():
             ORDER BY frequency DESC;
         """
         frequency_data = query2dict(frequency_query, conn)
-        frequency_data = level(frequency_data, "frequency_level") 
+        frequency_data, f_high_bound, f_low_bound = level(frequency_data, "frequency_level", "frequency") 
+
         print(frequency_data)
-        
+            
         #Monetary
         monetary_query = f"""
             SELECT o.CustomerID, SUM(p.Price) AS monetary FROM orders o
@@ -672,39 +688,90 @@ def RFM():
             ORDER BY monetary DESC;
         """
         monetary_data = query2dict(monetary_query, conn)
-        monetary_data = level(monetary_data, "monetary_level") 
+        monetary_data, m_high_bound, m_low_bound = level(monetary_data, "monetary_level", "monetary") 
         print(monetary_data)
 
+        # print(len(recency_data))
+        # print(len(frequency_data))
+        # print(len(monetary_data))
         #計算總分
         RFM_result = []
+        RFM_import_num = 0
+        RFM_general_num = 0
+        RFM_sleeping_num = 0
+        RFM_import_monetary = 0
+        RFM_general_monetary = 0
+        RFM_sleeping_monetary = 0
+        RFM_total_monetary = 0
+
         for i in range(len(recency_data)):
+            cus_type = segmentation(recency_data[i]["recency_level"], frequency_data[i]["frequency_level"], monetary_data[i]["monetary_level"])
+            print(cus_type)
+            if cus_type == "import_customer":
+                RFM_import_num += 1
+                RFM_import_monetary += monetary_data[i]["monetary"]
+            elif cus_type == "general_customer":
+                RFM_general_num += 1
+                RFM_general_monetary += monetary_data[i]["monetary"]
+            elif cus_type == "sleeping_customer":
+                RFM_sleeping_num += 1
+                RFM_sleeping_monetary += monetary_data[i]["monetary"]
+            RFM_total_monetary += monetary_data[i]["monetary"]
             RFM_result.append(
             {
                 "CustomerID": recency_data[i]["CustomerID"],
-                "total_score": recency_data[i]["recency_level"]*recency_weight + frequency_data[i]["frequency_level"]*frequency_weight + monetary_data[i]["monetary_level"]*monetary_weight,
+                "RFM_group": recency_data[i]["recency_level"]*recency_weight + frequency_data[i]["frequency_level"]*frequency_weight + monetary_data[i]["monetary_level"]*monetary_weight,
                 "recency_score": recency_data[i]["recency_level"],
                 "frequency_score": frequency_data[i]["frequency_level"],
                 "monetary_score": monetary_data[i]["monetary_level"],
+                "customer_type":cus_type
             })
-        RFM_result = sorted(RFM_result, key = lambda x:x["total_score"], reverse=True)
-        RFM_result = level(RFM_result, "RFM_group")
+        # RFM_result = sorted(RFM_result, key = lambda x:x["total_score"], reverse=True)
+        # RFM_result = level(RFM_result, "RFM_group")
         RFM_result = sorted(RFM_result, key = lambda x:x["RFM_group"], reverse=True)
         print(RFM_result)
-        response_object['RFM'] = RFM_result
-
-        #寫入資料庫
-        for i in RFM_result:
-            update = f"""
-                UPDATE customer SET RFM = {i["RFM_group"]} WHERE CustomerID = {i["CustomerID"]} 
-            """
-            conn.execute(text(update))
-            conn.execute(text("COMMIT;"))
         
+        # response_object['RFM'] = RFM_result
+        # customer_info_list = RFM_result
+        RFM_total_num = len(RFM_result)
 
+        #計算總體 RFM 資訊
+        RFM_info = {
+            "import_customer":{
+                "recency":f"{num_of_days(r_high_bound)} 天 ↓",
+                "frequency":f"{f_high_bound} 次 ↑",
+                "monetary":f"${m_high_bound} ↑",
+                "num_rate":f"{round((RFM_import_num/RFM_total_num)*100, 1)}%",
+                "revenue_rate":f"{round((RFM_import_monetary/RFM_total_monetary)*100, 1)}%"
+            },
+            "general_customer":{
+                "recency":f"{num_of_days(r_low_bound)} 天 ~ {num_of_days(r_high_bound)} 天",
+                "frequency":f"{f_high_bound} 次  ~ {f_low_bound} 次",
+                "monetary":f"${m_high_bound} ~ {m_low_bound}",
+                "num_rate":f"{round((RFM_general_num/RFM_total_num)*100, 1)}%",
+                "revenue_rate":f"{round((RFM_general_monetary/RFM_total_monetary)*100, 1)}%"
+            },
+            "sleeping_customer":{
+                "recency":f"{num_of_days(r_low_bound)} 天 ↑",
+                "frequency":f"{f_low_bound} 次 ↓",
+                "monetary":f"${m_low_bound} ↓",
+                "num_rate":f"{round((RFM_sleeping_num/RFM_total_num)*100, 1)}%",
+                "revenue_rate":f"{round((RFM_sleeping_monetary/RFM_total_monetary)*100, 1)}%"
+            }
+        }
+        print(RFM_info)
+        response_object['RFM_info'] = RFM_info
+        #寫入資料庫
+        # for i in RFM_result:
+        #     update = f"""
+        #         UPDATE customer SET RFM = {i["RFM_group"]} WHERE CustomerID = {i["CustomerID"]} 
+        #     """
+        #     conn.execute(text(update))
+        #     conn.execute(text("COMMIT;"))
     except Exception as e:
         response_object['status'] = "failure"
-        response_object['message'] = str(e)
-        print(str(e))
+        response_object['message'] = e
+        print(e)
         return jsonify(response_object)
     
 
@@ -1260,21 +1327,33 @@ def get_customer_info():
     def get_RFM():
         try:
             #設定分數
-            def level(data, name):
+            def level(data, name, value):
                 for i in range(len(data)):
                     if i <= len(data) * 0.2:
-                        data[i][name] = 5
+                        data[i][name] = 5                        
                     elif i <= len(data) * 0.4:
                         data[i][name] = 4
+                        boundary_high = data[i][value]
                     elif i <= len(data) * 0.6:
                         data[i][name] = 3
                     elif i <= len(data) * 0.8:
                         data[i][name] = 2
+                        boundary_low = data[i][value]
                     elif i <= len(data):
                         data[i][name] = 1
                 data = sorted(data, key = lambda x:x['CustomerID']) 
-                return data
+                return data, boundary_high, boundary_low
             
+            def segmentation(recency_data, frequency_data, monetary_data):
+                cus_type = ""
+                
+                if (recency_data > 3)&(frequency_data > 3)&(monetary_data > 3):
+                    cus_type = "import_customer"
+                elif (recency_data > 1)&(frequency_data > 1)&(monetary_data > 1):
+                    cus_type = "general_customer"
+                else:
+                    cus_type = "sleeping_customer"
+                return cus_type
             #設定權重
             recency_weight = 0.3
             frequency_weight = 0.3
@@ -1287,7 +1366,7 @@ def get_customer_info():
                 ORDER BY recent_date;
             """
             recency_data = query2dict(recency_query, conn)
-            recency_data = level(recency_data, "recency_level") 
+            recency_data, r_high_bound, r_low_bound = level(recency_data, "recency_level", "recent_date") 
             print(recency_data)
 
             #Frequency
@@ -1299,7 +1378,8 @@ def get_customer_info():
                 ORDER BY frequency DESC;
             """
             frequency_data = query2dict(frequency_query, conn)
-            frequency_data = level(frequency_data, "frequency_level") 
+            frequency_data, f_high_bound, f_low_bound = level(frequency_data, "frequency_level", "frequency") 
+
             print(frequency_data)
             
             #Monetary
@@ -1312,12 +1392,30 @@ def get_customer_info():
                 ORDER BY monetary DESC;
             """
             monetary_data = query2dict(monetary_query, conn)
-            monetary_data = level(monetary_data, "monetary_level") 
+            monetary_data, m_high_bound, m_low_bound = level(monetary_data, "monetary_level", "monetary") 
             print(monetary_data)
 
             #計算總分
             RFM_result = []
+            RFM_import_num = 0
+            RFM_general_num = 0
+            RFM_sleeping_num = 0
+            RFM_import_monetary = 0
+            RFM_general_monetary = 0
+            RFM_sleeping_monetary = 0
+            RFM_total_monetary = 0
             for i in range(len(recency_data)):
+                cus_type = segmentation(recency_data[i]["recency_level"], frequency_data[i]["frequency_level"], monetary_data[i]["monetary_level"])
+                if cus_type == "import_customer":
+                    RFM_import_num +=1
+                    RFM_import_monetary += monetary_data[i]["monetary"]
+                elif cus_type == "general_customer":
+                    RFM_general_num += 1
+                    RFM_general_monetary += monetary_data[i]["monetary"]
+                elif cus_type == "sleeping_customer":
+                    RFM_sleeping_num += 1
+                    RFM_sleeping_monetary += monetary_data[i]["monetary"]
+                RFM_total_monetary += monetary_data[i]["monetary"]
                 RFM_result.append(
                 {
                     "CustomerID": recency_data[i]["CustomerID"],
@@ -1325,14 +1423,43 @@ def get_customer_info():
                     "recency_score": recency_data[i]["recency_level"],
                     "frequency_score": frequency_data[i]["frequency_level"],
                     "monetary_score": monetary_data[i]["monetary_level"],
+                    "customer_type":cus_type
                 })
             RFM_result = sorted(RFM_result, key = lambda x:x["total_score"], reverse=True)
-            RFM_result = level(RFM_result, "RFM_group")
+            # RFM_result = level(RFM_result, "RFM_group")
+            RFM_result["RFM_group"] = RFM_result["total_score"]
             RFM_result = sorted(RFM_result, key = lambda x:x["RFM_group"], reverse=True)
             print(RFM_result)
             # response_object['RFM'] = RFM_result
             # customer_info_list = RFM_result
+            RFM_total_num = len(RFM_result)
 
+            #計算總體 RFM 資訊
+            RFM_info = {
+                "import_customer":{
+                    "recency":f"{r_high_bound} 天 ↓",
+                    "frequency":f"{r_high_bound} 次 ↑",
+                    "monetary":f"${m_high_bound} ↑",
+                    "num_rate":f"{round((RFM_import_num/RFM_total_num)*100, 1)}%",
+                    "revenue_rate":f"{round((RFM_import_monetary/RFM_total_monetary)*100, 1)}%"
+                },
+                "general_customer":{
+                    "recency":f"{r_low_bound} 天 ~ {r_high_bound} 天",
+                    "frequency":f"{r_high_bound} 次  ~ {r_low_bound} 次",
+                    "monetary":f"${m_high_bound} ~ {m_low_bound}",
+                    "num_rate":f"{round((RFM_import_num/RFM_total_num)*100, 1)}%",
+                    "revenue_rate":f"{round((RFM_import_monetary/RFM_total_monetary)*100)}%"
+                },
+                "sleeping_customer":{
+                    "recency":f"{r_low_bound} 天 ↓",
+                    "frequency":f"{r_low_bound} 次 ↑",
+                    "monetary":f"${m_low_bound} ↑",
+                    "num_rate":f"{round((RFM_sleeping_num/RFM_total_num)*100, 1)}%",
+                    "revenue_rate":f"{round((RFM_sleeping_monetary/RFM_total_monetary)*100, 1)}%"
+                }
+            }
+            print(RFM_info)
+            response_object['RFM_info'] = RFM_info
             #寫入資料庫
             for i in RFM_result:
                 update = f"""
@@ -1343,7 +1470,7 @@ def get_customer_info():
         except Exception as e:
             response_object['status'] = "failure"
             response_object['message'] = str(e)
-            print(str(e))
+            print(e)
             return jsonify(response_object)
     
     # get LTV
