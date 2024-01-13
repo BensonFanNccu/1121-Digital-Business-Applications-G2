@@ -2025,8 +2025,8 @@ def booking():
     seat = post_data.get("seat")
    
     custquery = f"""
-            SELECT count(CustomerID) FROM customer;
-        """
+        SELECT count(CustomerID) FROM customer;
+    """
     custResult = conn.execute(text(custquery))
     custNum = int(custResult.fetchone()[0])
     custID = random.randint(1, custNum)
