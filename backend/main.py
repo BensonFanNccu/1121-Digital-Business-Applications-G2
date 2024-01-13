@@ -1812,12 +1812,12 @@ def region_rank():
         sum = 0
         for row in result.fetchall():
             ratio = int(row[1]) / total
-            rankDict = {"rank" : i, "region" : row[0], "rate" : str(round(ratio * 100, 3)) + "%", "value" : row[1]}
+            rankDict = {"rank" : i, "region" : row[0], "rate" : str(round(ratio * 100, 2)) + "%", "value" : round(ratio * 100, 2)}
             rank_list.append(rankDict)
             sum += int(row[1])
             i += 1
 
-        rest = {"rank" : 6, "region" : "其他", "rate" : str(round((total - sum) / total * 100, 3)) + "%", "value" : float(total - sum)}
+        rest = {"rank" : 6, "region" : "其他", "rate" : str(round((total - sum) / total * 100, 2)) + "%", "value" : round((total - sum) / total * 100, 2)}
         rank_list.append(rest)
 
         response_object['rank'] = rank_list
