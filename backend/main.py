@@ -332,7 +332,7 @@ def get_sales_rate():
                             sales = 0
                             for num in sales_num:
                                 sales += num["count"] 
-                            sales_rate = sales / seat_num[0]["SeatNumber"]
+                            sales_rate = round(sales / seat_num[0]["SeatNumber"]*100, 4)
                         sales_list.append(sales_rate)
                 
                 response_object['sales_rate_list'] = sales_list
@@ -367,7 +367,7 @@ def get_sales_rate():
                             sales = 0
                             for num in sales_num:
                                 sales += num["count"] 
-                            sales_rate = sales / seat_num[0]["SeatNumber"]
+                            sales_rate = round(sales / seat_num[0]["SeatNumber"], 4)
                         sales_list.append(sales_rate)
                 
                 response_object['sales_rate_list'] = sales_list
@@ -393,7 +393,7 @@ def get_sales_rate():
                         sales = 0
                         for num in sales_num:
                             sales += num["count"] 
-                        sales_rate = sales / seat_num[0]["SeatNumber"]
+                        sales_rate = round(sales / seat_num[0]["SeatNumber"], 4)
                     sales_list.append(sales_rate)
                 
             response_object['sales_rate_list'] = sales_list
@@ -417,7 +417,7 @@ def get_sales_rate():
                     sales = 0
                     for num in sales_num:
                         sales += num["count"] 
-                    sales_rate = sales / seat_num[0]["SeatNumber"]
+                    sales_rate = round(sales / seat_num[0]["SeatNumber"], 4)
                 sales_list.append({f"{y}": sales_rate})
                 
             response_object['sales_rate_list'] = sales_list
@@ -1941,7 +1941,7 @@ def class_rank():
         total = int(result_all.fetchone()[0]) # 全部艙位的收益
 
         for row in result.fetchall():
-            rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 3)) + "%", "value" : row[1]}
+            rankDict = {"class" : row[0], "rate" : str(round((int(row[1]) / total) * 100, 2)) + "%", "value" : round((int(row[1]) / total) * 100, 2)}
             rank_list.append(rankDict)
         rank_list = sorted(rank_list, key = lambda x:x['class']) 
         response_object['rank'] = rank_list
