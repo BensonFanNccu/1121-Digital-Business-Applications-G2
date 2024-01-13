@@ -1628,8 +1628,8 @@ def get_customer_info():
 
     try:
         query = f"""
-            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM FROM customer
-            ORDER BY CustomerID;
+            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
+            FROM customer ORDER BY CustomerID;
         """
         customer_info_list = query2dict(query, conn)
 
@@ -1638,9 +1638,9 @@ def get_customer_info():
         response_object['message'] = str(e)
         print(str(e))
         return jsonify(response_object)
-    print(customer_info_list)
+    
+    # print(customer_info_list)
     response_object['customer_info'] = customer_info_list
-
     return jsonify(response_object)
 
 
@@ -2026,7 +2026,6 @@ def class_rank():
 @app.route('/booking', methods = ['POST'])
 def booking():
     response_object = {'status': 'success'}
-    post_data = request.get_json()
 
     try:
         conn = engine.connect()
@@ -2035,11 +2034,11 @@ def booking():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
+    post_data = request.get_json()
     origin = post_data.get("origin")
     dest = post_data.get("destination")
     date = post_data.get("department_date")
     pricelevel = post_data.get("class")
-    seat = post_data.get("seat")
    
     custquery = f"""
         SELECT count(CustomerID) FROM customer;
@@ -2047,46 +2046,34 @@ def booking():
     custResult = conn.execute(text(custquery))
     custNum = int(custResult.fetchone()[0])
     custID = random.randint(1, custNum)
+    seatID = random.randint(1, 180)
 
-    chkquery = f"""
-        SELECT OrderID FROM orders WHERE Date = '{date}' AND SeatID = '{seat}';
-    """
-    chkResult = conn.execute(text(chkquery))
-    dup = chkResult.fetchone()
+    try:
+        # 抓航班ID
+        query = f"""
+            SELECT FlightID FROM flight WHERE Origin = '{origin}' AND Destination = '{dest}';
+        """
+        result = conn.execute(text(query))
+        row = result.fetchone()
+        id = int(row[0])
 
-    if dup != None:
-        response_object['result'] = f"duplicate"
-        response_object['message'] = f"這個座位已被預訂。"
+        insert = f"""
+            INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Status) 
+            VALUES ("{date}", "{pricelevel}", {seatID}, {custID}, {id}, "OK");
+        """
+        conn.execute(text(insert))
+        conn.execute(text("COMMIT;"))
 
-    else:
-        try:
-            # 抓航班ID
-            query = f"""
-                SELECT FlightID FROM flight WHERE Origin = '{origin}' AND Destination = '{dest}';
-            """
-            result = conn.execute(text(query))
-            row = result.fetchone()
-            id = int(row[0])
-
-            insert = f"""
-                INSERT INTO orders (Date, PriceLevel, SeatID, CustomerID, FlightID, Status) 
-                VALUES ("{date}", "{pricelevel}", {seat}, {custID}, {id}, "OK");
-            """
-            conn.execute(text(insert))
-            conn.execute(text("COMMIT;"))
-
-        except Exception as e:
-            response_object['status'] = "failure"
-            response_object['message'] = str(e)
-            print(str(e))
-            return jsonify(response_object)
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
         
-        response_object['result'] = f"success"
-        response_object['message'] = f"訂位成功！"
+    response_object['result'] = f"success"
+    response_object['message'] = f"訂位成功！"
 
-        result.close()
-
-    chkResult.close()  
+    result.close()
     conn.close()
     
     return jsonify(response_object)
@@ -2105,6 +2092,7 @@ def booking_flight_info():
 
     post_data = request.get_json()
     date = post_data.get("depart_date")
+    resultList = []
 
     alllevels = ['A', 'B', 'C', 'D', 'E']
     levels = []
@@ -2138,10 +2126,95 @@ def booking_flight_info():
         result = conn.execute(text(query)).fetchone()[0]
         price.append(result)
 
-    response_object['remain_price_level'] = levels
-    response_object['seat_price'] = price
+    for i in range(len(price)):
+        resDict = {levels[i] : int(price[i])}
+        resultList.append(resDict)
+    
+    response_object['class_and_price'] = resultList
 
     return jsonify(response_object)
+
+# 純排序，沒有先算LTV, PCV, RFM
+@app.route('/ID_order', methods = ['GET'])
+def ID_order():
+    response_object = {'status': 'success'}
+
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    try:
+        query = f"""
+            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
+            FROM customer ORDER BY CustomerID;
+        """
+        customer_info_list = query2dict(query, conn)
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['cust_info_ID_Ordered'] = customer_info_list
+    return jsonify(response_object)
+
+
+@app.route('/PCV_order', methods = ['GET'])
+def PCV_order():
+    response_object = {'status': 'success'}
+
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    try:
+        query = f"""
+            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
+            FROM customer ORDER BY PCV DESC;
+        """
+        customer_info_list = query2dict(query, conn)
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['cust_info_PCV_Ordered'] = customer_info_list
+    return jsonify(response_object)
+
+
+@app.route('/LTV_order', methods = ['GET'])
+def LTV_order():
+    response_object = {'status': 'success'}
+
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
+    
+    try:
+        query = f"""
+            SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
+            FROM customer ORDER BY LTV DESC;
+        """
+        customer_info_list = query2dict(query, conn)
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(str(e))
+        return jsonify(response_object)
+    
+    response_object['cust_info_LTV_Ordered'] = customer_info_list
+    return jsonify(response_object)
+
 
 @app.route('/add_data', methods = ['GET'])
 def add_data():
@@ -2209,9 +2282,6 @@ def add_data():
                 """
                 conn.execute(text(update))
                 conn.execute(text("COMMIT;"))
-
-            
-
     conn.close()
     return jsonify(response_object)
 
