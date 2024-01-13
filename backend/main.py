@@ -2173,6 +2173,48 @@ def PCV_order():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
+    def getPCV():
+        try:
+            rate = 0.02
+            year = 2023
+            PCVlist = [[]]
+
+            custquery = f"""
+                SELECT count(CustomerID) FROM customer;
+            """
+            custResult = conn.execute(text(custquery))
+            custNum = int(custResult.fetchone()[0])
+
+            for i in range(custNum - 1):
+                PCVlist.append([])
+
+            for qtr in range(1, 5):
+                query = f"""
+                    SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
+                    JOIN ticketprice p ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                    WHERE o.Date BETWEEN '{year}/{qtr * 3 - 2}/1' AND '{year}/{qtr * 3}/30'
+                    GROUP BY CustomerID;
+                """
+                result = conn.execute(text(query))
+
+                for row in result.fetchall():
+                    id = int(row[0])
+                    value = float(int(row[1]) * ((1 + rate) ** (4 - qtr)))
+                    PCVlist[id - 1].append(value)
+
+            for j in range(len(PCVlist)):
+                pcv = float(sum(PCVlist[j]))
+                update = f"""
+                    UPDATE customer SET PCV = {pcv} WHERE CustomerID = {j + 1}; 
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            print(str(e))
+
+    getPCV()
+    
     try:
         query = f"""
             SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
@@ -2199,6 +2241,46 @@ def LTV_order():
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
+    
+    def getLTV():
+        try:
+            queryCount = f"""
+                SELECT count(CustomerID) FROM customer;
+            """
+            countResult = conn.execute(text(queryCount))
+            cRow = countResult.fetchone()
+            custNum = cRow[0]
+
+            year = 2023
+            rate = 0.02
+
+            for i in range(1, custNum + 1):
+                query = f"""
+                    SELECT sum(t.Price) FROM orders as o, ticketprice as t 
+                    WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
+                """
+
+                result = conn.execute(text(query))
+                row = result.fetchone()
+                value = row[0]
+
+                if value != None:
+                    avg = value / 4
+                    LTV = avg * (1 - 1 / (1 + rate) ** 6) / rate
+                else:
+                    LTV = 0.0
+            
+                update = f"""
+                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))        
+
+        except Exception as e:
+            print(str(e))
+
+    getLTV()
     
     try:
         query = f"""
