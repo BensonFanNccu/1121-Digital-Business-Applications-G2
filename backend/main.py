@@ -1250,21 +1250,24 @@ def get_left_seat():
         return jsonify(response_object)
     
     post_data = request.get_json()
-    flightID = post_data.get("flightID")
+    flightcode = post_data.get("flight_code")
     date = post_data.get("date")
     
     try:
-        # 抓座位數
+        query_ID = f"""
+            SELECT FlightID FROM flight WHERE FlightCode = "{flightcode}"; 
+        """
+        result_ID = conn.execute(text(query_ID))
+        flightID = int(result_ID.fetchone()[0])
+
         querySeat = f"""
             SELECT a.SeatNumber FROM flight as f, airplanetype as a 
             WHERE f.AirplaneTypeID = a.AirplaneTypeID AND f.FlightID = {flightID};
         """
-
         result_seat = conn.execute(text(querySeat))
         row_seat = result_seat.fetchone()
         seatNumber = int(row_seat[0])
 
-        # 獲取哪些座位被預訂
         query = f"""
             SELECT o.SeatID FROM orders o WHERE o.FlightID = {flightID} AND o.Date = "{date}" AND o.Status = 'OK';
         """
@@ -1273,8 +1276,7 @@ def get_left_seat():
         ordered_seat = []
         for row in result.fetchall():
             ordered_seat.append(int(row[0]))
-
-        # 獲取尚未被預訂的座位
+        
         vacant = []
         for i in range(1, seatNumber + 1):
             if(i in ordered_seat) == False:
