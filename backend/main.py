@@ -1612,6 +1612,7 @@ def get_customer_info():
         for i in customer_info_list:
             i["LTV"] = round(i["LTV"], 1)
             i["PCV"] = round(i["PCV"], 1)
+            i["Birthday"] = f'{(i["Birthday"])}'
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
