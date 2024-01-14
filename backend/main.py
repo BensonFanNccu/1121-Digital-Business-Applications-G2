@@ -1474,12 +1474,15 @@ def get_customer_info():
             for i in range(len(recency_data)):
                 cus_type = segmentation(recency_data[i]["recency_level"], frequency_data[i]["frequency_level"], monetary_data[i]["monetary_level"])
                 if cus_type == "import_customer":
+                    cus_type = "黃金客"
                     RFM_import_num +=1
                     RFM_import_monetary += monetary_data[i]["monetary"]
                 elif cus_type == "general_customer":
+                    cus_type = "一般客"
                     RFM_general_num += 1
                     RFM_general_monetary += monetary_data[i]["monetary"]
                 elif cus_type == "sleeping_customer":
+                    cus_type = "沉睡客"
                     RFM_sleeping_num += 1
                     RFM_sleeping_monetary += monetary_data[i]["monetary"]
                 RFM_total_monetary += monetary_data[i]["monetary"]
@@ -1493,44 +1496,15 @@ def get_customer_info():
                     "customer_type":cus_type
                 })
             RFM_result = sorted(RFM_result, key = lambda x:x["total_score"], reverse=True)
-            # RFM_result = level(RFM_result, "RFM_group")
-            RFM_result["RFM_group"] = RFM_result["total_score"]
+            RFM_result, a, b = level(RFM_result, "RFM_group", "total_score")
+            # RFM_result["RFM_group"] = RFM_result["total_score"]
             RFM_result = sorted(RFM_result, key = lambda x:x["RFM_group"], reverse=True)
             print(RFM_result)
-            # response_object['RFM'] = RFM_result
-            # customer_info_list = RFM_result
-            RFM_total_num = len(RFM_result)
 
-            #計算總體 RFM 資訊
-            RFM_info = {
-                "import_customer":{
-                    "recency":f"{r_high_bound} 天 ↓",
-                    "frequency":f"{r_high_bound} 次 ↑",
-                    "monetary":f"${m_high_bound} ↑",
-                    "num_rate":f"{round((RFM_import_num/RFM_total_num)*100, 1)}%",
-                    "revenue_rate":f"{round((RFM_import_monetary/RFM_total_monetary)*100, 1)}%"
-                },
-                "general_customer":{
-                    "recency":f"{r_low_bound} 天 ~ {r_high_bound} 天",
-                    "frequency":f"{r_high_bound} 次  ~ {r_low_bound} 次",
-                    "monetary":f"${m_high_bound} ~ {m_low_bound}",
-                    "num_rate":f"{round((RFM_import_num/RFM_total_num)*100, 1)}%",
-                    "revenue_rate":f"{round((RFM_import_monetary/RFM_total_monetary)*100)}%"
-                },
-                "sleeping_customer":{
-                    "recency":f"{r_low_bound} 天 ↓",
-                    "frequency":f"{r_low_bound} 次 ↑",
-                    "monetary":f"${m_low_bound} ↑",
-                    "num_rate":f"{round((RFM_sleeping_num/RFM_total_num)*100, 1)}%",
-                    "revenue_rate":f"{round((RFM_sleeping_monetary/RFM_total_monetary)*100, 1)}%"
-                }
-            }
-            print(RFM_info)
-            response_object['RFM_info'] = RFM_info
             #寫入資料庫
             for i in RFM_result:
                 update = f"""
-                    UPDATE customer SET RFM = {i["RFM_group"]} WHERE CustomerID = {i["CustomerID"]} 
+                    UPDATE customer SET RFM = "{i["customer_type"]}" WHERE CustomerID = {i["CustomerID"]} 
                 """
                 conn.execute(text(update))
                 conn.execute(text("COMMIT;"))
@@ -1555,7 +1529,7 @@ def get_customer_info():
 
             for i in price_data:
                 if i["total_price"] != None:
-                    LTV = i["total_price"] / 4 * (1 - 1 / (1 + rate) ** 6) / rate
+                    LTV = round(i["total_price"] / 4 * (1 - 1 / (1 + rate) ** 6) / rate)
                 else:
                     LTV = 0.0
 
@@ -1602,11 +1576,11 @@ def get_customer_info():
 
                 for row in result.fetchall():
                     id = int(row[0])
-                    value = float(int(row[1]) * ((1 + rate) ** (4 - qtr)))
+                    value = round(float(int(row[1]) * ((1 + rate) ** (4 - qtr))))
                     PCVlist[id - 1].append(value)
 
             for j in range(len(PCVlist)):
-                pcv = float(sum(PCVlist[j]))
+                pcv = round(float(sum(PCVlist[j])))
                 update = f"""
                     UPDATE customer SET PCV = {pcv} WHERE CustomerID = {j + 1}; 
                 """
