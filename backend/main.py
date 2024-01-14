@@ -1753,7 +1753,7 @@ def region_rank():
     rank_list = []
     current_time = datetime.now()
     year = 2023
-    month = current_time.month
+    curmonth = current_time.month
     day = current_time.day
 
     try:
@@ -1763,14 +1763,14 @@ def region_rank():
                     SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}' 
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth}/{day - 7}' AND '{year}/{curmonth}/{day - 1}' 
                     GROUP BY City ORDER BY Total DESC LIMIT 5;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}';
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth}/{day - 7}' AND '{year}/{curmonth}/{day - 1}';
                 """
 
             elif day == 1:
@@ -1778,14 +1778,14 @@ def region_rank():
                     SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30' 
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth - 1}/24' AND '{year}/{curmonth - 1}/30' 
                     GROUP BY City ORDER BY Total DESC LIMIT 5;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30';
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth - 1}/24' AND '{year}/{curmonth - 1}/30';
                 """
 
             else:
@@ -1793,53 +1793,58 @@ def region_rank():
                     SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                     JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}' 
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth - 1}/{day + 23}' AND '{year}/{curmonth}/{day - 1}' 
                     GROUP BY City ORDER BY Total DESC LIMIT 5;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                     JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
+                    WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{curmonth - 1}/{day + 23}' AND '{year}/{curmonth}/{day - 1}';
                 """
 
         elif time == "月":
+            if curmonth == 1:
+                month = 12
+            else:
+                month = curmonth - 1
+
             query = f"""
                 SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30' 
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31' 
                 GROUP BY City ORDER BY Total DESC LIMIT 5;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30';
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31';
             """
 
         elif time == "季":
-            if month <= 3:
-                quarter = 1
-            elif month <=6:
-                quarter = 2
-            elif month <= 9:
-                quarter = 3
-            else:
+            if curmonth <= 3:
                 quarter = 4
+            elif curmonth <=6:
+                quarter = 1
+            elif curmonth <= 9:
+                quarter = 2
+            else:
+                quarter = 3
 
             query = f"""
                 SELECT SUBSTRING(c.Address, 1, 3) AS City, SUM(t.Price) AS Total FROM customer c
                 JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30' 
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31' 
                 GROUP BY City ORDER BY Total DESC LIMIT 5;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price) FROM customer c JOIN orders o ON c.CustomerID = o.CustomerID
                 JOIN ticketprice t ON (o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID)
-                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30';
+                WHERE o.Status = 'OK' AND o.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31';
             """
             
         elif time == "年":
@@ -1919,7 +1924,7 @@ def class_rank():
     rank_list = []
     current_time = datetime.now()
     year = 2023
-    month = current_time.month
+    curmonth = current_time.month
     day = current_time.day
     # day = 8
 
@@ -1928,79 +1933,84 @@ def class_rank():
             if day > 7:
                 query = f"""
                     SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}' 
+                    WHERE t.Date BETWEEN '{year}/{curmonth}/{day - 7}' AND '{year}/{curmonth}/{day - 1}' 
                     GROUP BY t.PriceLevel ORDER BY Total DESC;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price * t.Amount) FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month}/{day - 7}' AND '{year}/{month}/{day - 1}';
+                    WHERE t.Date BETWEEN '{year}/{curmonth}/{day - 7}' AND '{year}/{curmonth}/{day - 1}';
                 """
             elif day == 1:
                 query = f"""
                     SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30' 
+                    WHERE t.Date BETWEEN '{year}/{curmonth - 1}/24' AND '{year}/{curmonth - 1}/30' 
                     GROUP BY t.PriceLevel ORDER BY Total DESC;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month - 1}/24' AND '{year}/{month - 1}/30';
+                    WHERE t.Date BETWEEN '{year}/{curmonth - 1}/24' AND '{year}/{curmonth - 1}/30';
                 """
             else:
                 query = f"""
                     SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}' 
+                    WHERE t.Date BETWEEN '{year}/{curmonth - 1}/{day + 23}' AND '{year}/{curmonth}/{day - 1}' 
                     GROUP BY t.PriceLevel ORDER BY Total DESC;
                 """
 
                 query_all = f"""
                     SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                    WHERE t.Date BETWEEN '{year}/{month - 1}/{day + 23}' AND '{year}/{month}/{day - 1}';
+                    WHERE t.Date BETWEEN '{year}/{curmonth - 1}/{day + 23}' AND '{year}/{curmonth}/{day - 1}';
                 """
         elif time == "月":
+            if curmonth == 1:
+                month = 12
+            else:
+                month = curmonth - 1
+
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31'
                 GROUP BY t.PriceLevel ORDER BY Total DESC;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/30'
+                WHERE t.Date BETWEEN '{year}/{month}/1' AND '{year}/{month}/31'
             """
 
         elif time == "季":
-            if month <= 3:
-                quarter = 1
-            elif month <=6:
-                quarter = 2
-            elif month <= 9:
-                quarter = 3
-            else:
+            if curmonth <= 3:
                 quarter = 4
+            elif curmonth <=6:
+                quarter = 1
+            elif curmonth <= 9:
+                quarter = 2
+            else:
+                quarter = 3
 
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31'
                 GROUP BY t.PriceLevel ORDER BY Total DESC;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/30'
+                WHERE t.Date BETWEEN '{year}/{quarter * 3 - 2}/1' AND '{year}/{quarter * 3}/31'
             """
             
         else: # 單日
             query = f"""
                 SELECT t.PriceLevel, SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date = '{year}/{month}/{day}'
+                WHERE t.Date = '{year}/{curmonth}/{day}'
                 GROUP BY t.PriceLevel ORDER BY Total DESC;
             """
 
             query_all = f"""
                 SELECT SUM(t.Price * t.Amount) AS Total FROM ticketprice t 
-                WHERE t.Date = '{year}/{month}/{day}';
+                WHERE t.Date = '{year}/{curmonth}/{day}';
             """
 
         result = conn.execute(text(query))
@@ -2130,8 +2140,8 @@ def booking_flight_info():
         price.append(result)
 
     for i in range(len(price)):
-        resDict = {levels[i] : int(price[i])}
-        resultList.append(resDict)
+        string = levels[i] + ", " + str(int(price[i])) + "元"
+        resultList.append(string)
     
     response_object['class_and_price'] = resultList
 
@@ -2176,6 +2186,48 @@ def PCV_order():
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
     
+    def getPCV():
+        try:
+            rate = 0.02
+            year = 2023
+            PCVlist = [[]]
+
+            custquery = f"""
+                SELECT count(CustomerID) FROM customer;
+            """
+            custResult = conn.execute(text(custquery))
+            custNum = int(custResult.fetchone()[0])
+
+            for i in range(custNum - 1):
+                PCVlist.append([])
+
+            for qtr in range(1, 5):
+                query = f"""
+                    SELECT o.CustomerID, SUM(p.Price) AS PCV FROM orders o
+                    JOIN ticketprice p ON (o.PriceLevel = p.PriceLevel AND o.Date = p.Date AND o.FlightID = p.FlightID)
+                    WHERE o.Date BETWEEN '{year}/{qtr * 3 - 2}/1' AND '{year}/{qtr * 3}/30'
+                    GROUP BY CustomerID;
+                """
+                result = conn.execute(text(query))
+
+                for row in result.fetchall():
+                    id = int(row[0])
+                    value = float(int(row[1]) * ((1 + rate) ** (4 - qtr)))
+                    PCVlist[id - 1].append(value)
+
+            for j in range(len(PCVlist)):
+                pcv = float(sum(PCVlist[j]))
+                update = f"""
+                    UPDATE customer SET PCV = {pcv} WHERE CustomerID = {j + 1}; 
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))
+
+        except Exception as e:
+            print(str(e))
+
+    getPCV()
+    
     try:
         query = f"""
             SELECT CustomerID, CONCAT(FirstName," ", LastName) Customer_name, Gender, PhoneNumber, Birthday, Email, Address, LTV, PCV, RFM 
@@ -2202,6 +2254,46 @@ def LTV_order():
         response_object['status'] = "failure"
         response_object['message'] = "資料庫連線失敗"
         return jsonify(response_object)
+    
+    def getLTV():
+        try:
+            queryCount = f"""
+                SELECT count(CustomerID) FROM customer;
+            """
+            countResult = conn.execute(text(queryCount))
+            cRow = countResult.fetchone()
+            custNum = cRow[0]
+
+            year = 2023
+            rate = 0.02
+
+            for i in range(1, custNum + 1):
+                query = f"""
+                    SELECT sum(t.Price) FROM orders as o, ticketprice as t 
+                    WHERE o.Date = t.Date AND o.PriceLevel = t.PriceLevel AND o.FlightID = t.FlightID 
+                    AND o.CustomerID = {i} AND (o.Date BETWEEN '{year}/1/1' AND '{year}/12/31');
+                """
+
+                result = conn.execute(text(query))
+                row = result.fetchone()
+                value = row[0]
+
+                if value != None:
+                    avg = value / 4
+                    LTV = avg * (1 - 1 / (1 + rate) ** 6) / rate
+                else:
+                    LTV = 0.0
+            
+                update = f"""
+                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+                """
+                conn.execute(text(update))
+                conn.execute(text("COMMIT;"))        
+
+        except Exception as e:
+            print(str(e))
+
+    getLTV()
     
     try:
         query = f"""
