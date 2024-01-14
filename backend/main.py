@@ -1609,7 +1609,9 @@ def get_customer_info():
             FROM customer ORDER BY CustomerID;
         """
         customer_info_list = query2dict(query, conn)
-
+        for i in customer_info_list:
+            i["LTV"] = round(i["LTV"], 1)
+            i["PCV"] = round(i["PCV"], 1)
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
@@ -1668,7 +1670,7 @@ def CE():
                     LTV = 0
             
                 update = f"""
-                    UPDATE customer SET LTV = {LTV} WHERE CustomerID = {i};
+                    UPDATE customer SET LTV = {round(LTV)} WHERE CustomerID = {i};
                 """
                 conn.execute(text(update))
                 conn.execute(text("COMMIT;"))
