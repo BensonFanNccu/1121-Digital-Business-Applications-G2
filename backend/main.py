@@ -533,6 +533,8 @@ def get_order():
     post_data = request.get_json()
     flight_id = post_data.get("flight_id")
     date = post_data.get("date")
+    date = date.date()
+    # date = ""
     #對比信箱，如正確回傳 user_id
     
     try:
@@ -577,7 +579,7 @@ def get_order():
         result = conn.execute(text(query))
         keys = list(result.keys())
         data = [dict(zip(keys, row)) for row in result.fetchall()]
-        print(data)
+        # print(data)
         response_object['orders'] = data
     except Exception as e:
         response_object['status'] = "failure"
@@ -607,6 +609,7 @@ def get_cancel_order():
     post_data = request.get_json()
     flight_id = post_data.get("flight_id")
     date = post_data.get("date")
+    date = date.date()
     #對比信箱，如正確回傳 user_id
     
     try:
