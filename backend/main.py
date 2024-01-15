@@ -531,15 +531,14 @@ def get_order():
 
     #取得資料
     post_data = request.get_json()
-    flight_id = post_data.get("flight_id")
+    # flight_id = post_data.get("flight_id")
+    flight_id = 1
     date = post_data.get("date")
-    date = date.date()
     # date = ""
     #對比信箱，如正確回傳 user_id
     
     try:
         if (flight_id != "")&(date != ""):
-
             query = f"""
                 SELECT o.CustomerId, CONCAT(c.FirstName, " ", c.LastName) CustomerName, f.FlightCode, p.Price, o.PriceLevel, o.Date, f.Origin, f.Destination FROM orders o
                 JOIN flight f
@@ -607,9 +606,9 @@ def get_cancel_order():
 
     #取得資料
     post_data = request.get_json()
-    flight_id = post_data.get("flight_id")
+    # flight_id = post_data.get("flight_id")
+    flight_id = 1
     date = post_data.get("date")
-    date = date.date()
     #對比信箱，如正確回傳 user_id
     
     try:
