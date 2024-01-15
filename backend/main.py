@@ -533,7 +533,6 @@ def get_order():
     post_data = request.get_json()
     flight_id = post_data.get("flight_id")
     date = post_data.get("date")
-    date = date.date()
     # date = ""
     #對比信箱，如正確回傳 user_id
     
