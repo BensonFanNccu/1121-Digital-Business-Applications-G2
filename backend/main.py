@@ -2141,6 +2141,11 @@ def ID_order():
             FROM customer ORDER BY CustomerID;
         """
         customer_info_list = query2dict(query, conn)
+        for i in customer_info_list:
+            i["LTV"] = round(i["LTV"], 1)
+            i["PCV"] = round(i["PCV"], 1)
+            i["Birthday"] = f'{(i["Birthday"])}'
+            
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
@@ -2210,6 +2215,11 @@ def PCV_order():
             FROM customer ORDER BY PCV DESC;
         """
         customer_info_list = query2dict(query, conn)
+        for i in customer_info_list:
+            i["LTV"] = round(i["LTV"], 1)
+            i["PCV"] = round(i["PCV"], 1)
+            i["Birthday"] = f'{(i["Birthday"])}'
+
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
@@ -2277,6 +2287,11 @@ def LTV_order():
             FROM customer ORDER BY LTV DESC;
         """
         customer_info_list = query2dict(query, conn)
+        for i in customer_info_list:
+            i["LTV"] = round(i["LTV"], 1)
+            i["PCV"] = round(i["PCV"], 1)
+            i["Birthday"] = f'{(i["Birthday"])}'
+
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = str(e)
