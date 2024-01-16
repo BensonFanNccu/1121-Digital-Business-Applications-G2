@@ -713,6 +713,8 @@ def RFM():
         def num_of_days(date):  
             return (dt.datetime.today() - dt.datetime.strptime(str(date), "%Y-%m-%d")).days
         
+        year = 2023
+
         #設定權重
         recency_weight = 0.3
         frequency_weight = 0.3
@@ -721,6 +723,7 @@ def RFM():
         # Recency
         recency_query = f"""
             SELECT CustomerID, MAX(Date) AS recent_date FROM orders
+            WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
             GROUP BY CustomerID
             ORDER BY recent_date DESC;
         """
@@ -729,8 +732,7 @@ def RFM():
         recency_data, r_high_bound, r_low_bound = level(recency_data, "recency_level", "recent_date") 
         print(recency_data)
 
-        #Frequency
-        year = 2023
+        #Frequency       
         frequency_query = f"""
             SELECT CustomerID, COUNT(OrderID) AS frequency FROM orders
             WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
@@ -1420,6 +1422,9 @@ def get_customer_info():
                 else:
                     cus_type = "sleeping_customer"
                 return cus_type
+            
+            year = 2023
+            
             #設定權重
             recency_weight = 0.3
             frequency_weight = 0.3
@@ -1428,6 +1433,7 @@ def get_customer_info():
             # Recency
             recency_query = f"""
                 SELECT CustomerID, MAX(Date) AS recent_date FROM orders
+                WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
                 GROUP BY CustomerID
                 ORDER BY recent_date;
             """
@@ -1436,7 +1442,7 @@ def get_customer_info():
             print(recency_data)
 
             #Frequency
-            year = 2023
+            
             frequency_query = f"""
                 SELECT CustomerID, COUNT(OrderID) AS frequency FROM orders
                 WHERE Date BETWEEN '{year}/1/1' AND '{year}/12/31'
